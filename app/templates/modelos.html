@@ -3,6 +3,312 @@
 {% block titulo %}Modelos{% endblock %}
 
 {% block conteudo %}
+{% macro pct(valor) %}{{ (valor * 100) | numero(1) }}%{% endmacro %}
+{% macro pontos(valor) %}{{ "+" if valor > 0 }}{{ (valor * 100) | numero(1) }}<span class="fs-6"> p.p.</span>{% endmacro %}
+{% macro parametro(valor) %}{{ valor | string | replace(".", ",") if valor is float else valor }}{% endmacro %}
+
 <h1 class="h3">Modelos</h1>
-<p class="text-secondary">Em construção.</p>
+<p class="text-secondary">
+  Classificação do partido vencedor do 2º turno presidencial (PT × PL) em cada município, a partir do perfil
+  do eleitorado, da participação e de indicadores socioeconômicos.
+</p>
+
+<div class="alert alert-info" role="alert">{{ resultados.aviso }}</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-4">
+    <section class="card">
+      <div class="card-body">
+        <h2 class="h5 card-title">Configuração do treino</h2>
+        <form>
+          <div class="mb-3">
+            <label for="modelo" class="form-label">Modelo</label>
+            <select class="form-select" id="modelo" name="modelo">
+              {% for chave, nome in modelos.items() %}
+              <option value="{{ chave }}" {% if chave == modelo_atual %}selected{% endif %}>{{ nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% set arvore = resultados.modelos.arvore.parametros %}
+          <fieldset class="mb-3" data-parametros="arvore" {% if modelo_atual != "arvore" %}hidden{% endif %}>
+            <legend class="fs-6 fw-semibold">Parâmetros da Árvore de Decisão</legend>
+            <div class="mb-2">
+              <label for="max_depth" class="form-label">Profundidade máxima (<code>max_depth</code>)</label>
+              <input type="number" class="form-control" id="max_depth" name="max_depth"
+                     min="1" max="30" value="{{ arvore.max_depth }}" placeholder="Sem limite">
+              <div class="form-text">De 1 a 30; vazio = sem limite.</div>
+            </div>
+            <div>
+              <label for="min_samples_split" class="form-label">Mínimo de amostras para dividir (<code>min_samples_split</code>)</label>
+              <input type="number" class="form-control" id="min_samples_split" name="min_samples_split"
+                     min="2" max="50" value="{{ arvore.min_samples_split }}">
+              <div class="form-text">De 2 a 50.</div>
+            </div>
+          </fieldset>
+
+          {% set knn = resultados.modelos.knn.parametros %}
+          <fieldset class="mb-3" data-parametros="knn" {% if modelo_atual != "knn" %}hidden{% endif %}>
+            <legend class="fs-6 fw-semibold">Parâmetros do KNN</legend>
+            <div class="mb-2">
+              <label for="n_neighbors" class="form-label">Número de vizinhos (<code>n_neighbors</code>)</label>
+              <input type="number" class="form-control" id="n_neighbors" name="n_neighbors"
+                     min="1" max="50" value="{{ knn.n_neighbors }}">
+              <div class="form-text">De 1 a 50.</div>
+            </div>
+            <div>
+              <label for="weights" class="form-label">Peso dos vizinhos (<code>weights</code>)</label>
+              <select class="form-select" id="weights" name="weights">
+                {% for valor, rotulo in [("uniform", "Iguais (uniform)"), ("distance", "Pela distância (distance)")] %}
+                <option value="{{ valor }}" {% if valor == knn.weights %}selected{% endif %}>{{ rotulo }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </fieldset>
+
+          {% set logistica = resultados.modelos.logistica.parametros %}
+          <fieldset class="mb-3" data-parametros="logistica" {% if modelo_atual != "logistica" %}hidden{% endif %}>
+            <legend class="fs-6 fw-semibold">Parâmetros da Regressão Logística</legend>
+            <label for="C" class="form-label">Inverso da regularização (<code>C</code>)</label>
+            <input type="number" class="form-control" id="C" name="C"
+                   min="0.01" max="100" step="0.01" value="{{ logistica.C }}">
+            <div class="form-text">De 0,01 a 100; quanto menor, mais simples o modelo.</div>
+          </fieldset>
+
+          <div class="mb-3">
+            <label for="tamanho_teste" class="form-label">Tamanho do teste</label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="tamanho_teste" name="tamanho_teste"
+                     min="10" max="40" step="5" value="{{ (resultados.tamanho_teste * 100) | round | int }}">
+              <span class="input-group-text">%</span>
+            </div>
+            <div class="form-text">De 10% a 40% dos municípios ficam fora do treino para avaliar o modelo.</div>
+          </div>
+
+          <fieldset class="mb-3">
+            <legend class="fs-6 fw-semibold">Variáveis preditoras</legend>
+            {% for coluna in resultados.variaveis %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="var_{{ coluna }}" name="variaveis" value="{{ coluna }}" checked>
+              <label class="form-check-label" for="var_{{ coluna }}">{{ rotulos[coluna] }}</label>
+            </div>
+            {% endfor %}
+          </fieldset>
+
+          <button type="button" class="btn btn-primary w-100" disabled>Treinar</button>
+          <p class="form-text text-center mb-0">Disponível na entrega final.</p>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-8" id="resultados">
+    <ul class="nav nav-pills mb-3">
+      {% for chave, nome in modelos.items() %}
+      <li class="nav-item">
+        <a class="nav-link {% if chave == modelo_atual %}active{% endif %}"
+           {% if chave == modelo_atual %}aria-current="page"{% endif %}
+           href="{{ url_for('modelos.index', modelo=chave, _anchor='resultados') }}">{{ nome }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <section class="row g-3 mb-3">
+      {% set cards = [
+        ("Acurácia de treino", pct(metricas.acuracia_treino), "acertos nos dados de treino", "text-secondary"),
+        ("Acurácia de teste", pct(metricas.acuracia_teste), "acertos em municípios não vistos", "text-secondary"),
+        ("Diferença treino × teste", pontos(metricas.diferenca_treino_teste),
+          "possível overfitting" if metricas.possivel_overfitting else "sem sinal de overfitting",
+          "text-warning-emphasis" if metricas.possivel_overfitting else "text-success"),
+        ("F1 macro", metricas.f1_macro | numero(2), "média do F1 de PT e PL", "text-secondary"),
+        ("Ganho sobre o baseline", pontos(metricas.ganho_baseline),
+          "baseline: " ~ pct(resultados.baseline.acuracia_teste), "text-secondary"),
+      ] %}
+      {% for titulo, valor, detalhe, classe_detalhe in cards %}
+      <div class="col-6 col-md-4 col-xl">
+        <div class="card h-100 text-center">
+          <div class="card-body">
+            <div class="text-secondary small">{{ titulo }}</div>
+            <div class="fs-4 fw-semibold">{{ valor }}</div>
+            <div class="small {{ classe_detalhe }}">{{ detalhe }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <section class="card h-100">
+          <div class="card-body">
+            <h2 class="h5 card-title">Relatório de classificação</h2>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Partido</th><th class="text-end">Precisão</th><th class="text-end">Recall</th>
+                    <th class="text-end">F1</th><th class="text-end">Suporte</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for partido in resultados.classes %}
+                  {% set linha = modelo.relatorio[partido] %}
+                  <tr>
+                    <td class="fw-semibold">{{ partido }}</td>
+                    <td class="text-end">{{ linha.precisao | numero(2) }}</td>
+                    <td class="text-end">{{ linha.recall | numero(2) }}</td>
+                    <td class="text-end">{{ linha.f1 | numero(2) }}</td>
+                    <td class="text-end">{{ linha.suporte }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <p class="small text-secondary mb-0">
+              <strong>Precisão:</strong> das previsões para o partido, quantas acertaram.
+              <strong>Recall:</strong> dos municípios que o partido venceu, quantos o modelo encontrou.
+              <strong>Suporte:</strong> municípios de cada partido no teste.
+            </p>
+          </div>
+        </section>
+      </div>
+      <div class="col-md-6">
+        <section class="card h-100">
+          <div class="card-body">
+            <h2 class="h5 card-title">Matriz de confusão</h2>
+            <img class="img-fluid d-block mx-auto" src="data:image/png;base64,{{ matriz_confusao }}" alt="Matriz de confusão">
+            <p class="small text-secondary mb-0">Linhas: vencedor real. Colunas: vencedor previsto. A diagonal são os acertos.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <section class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5 card-title">Importância das variáveis</h2>
+        {% if importancia %}
+        <img class="img-fluid d-block mx-auto" src="data:image/png;base64,{{ importancia }}" alt="Importância das variáveis">
+        {% else %}
+        <p class="text-secondary mb-0">
+          O KNN não calcula importância das variáveis: ele classifica cada município pelos vizinhos mais
+          parecidos, sem atribuir um peso a cada variável.
+        </p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-body">
+        <h2 class="h5 card-title">Resumo do treino</h2>
+        <dl class="row mb-3">
+          <dt class="col-sm-4">Base</dt>
+          <dd class="col-sm-8"><code>{{ resumo.base }}</code></dd>
+          <dt class="col-sm-4">Treinado em</dt>
+          <dd class="col-sm-8">{{ resumo.treinado_em }}</dd>
+          <dt class="col-sm-4">Tamanho do teste</dt>
+          <dd class="col-sm-8">{{ (resumo.tamanho_teste * 100) | numero }}% ({{ resumo.municipios_teste | numero }} municípios)</dd>
+          <dt class="col-sm-4">Parâmetros</dt>
+          <dd class="col-sm-8 mb-0">
+            {% for nome, valor in resumo.parametros.items() %}
+            <code>{{ nome }}</code> = {{ parametro(valor) }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </dd>
+        </dl>
+        <button type="button" class="btn btn-outline-primary" disabled>Re-treinar</button>
+        <p class="form-text mb-0">
+          Disponível na entrega final: quando uma nova base for enviada na página Dados,
+          o modelo poderá ser re-treinado com os novos dados.
+        </p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="card mb-4">
+  <div class="card-body">
+    <h2 class="h5 card-title">Comparação entre modelos</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th rowspan="2" class="align-bottom">Modelo</th>
+            <th colspan="2" class="text-center border-bottom-0">Acurácia</th>
+            <th rowspan="2" class="text-end text-nowrap align-bottom">F1 macro</th>
+          </tr>
+          <tr>
+            <th class="text-end">Treino</th><th class="text-end">Teste</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in comparacao %}
+          {# O Bootstrap define a cor nas células, por isso o cinza do baseline vai em cada <td> #}
+          {% set cor = "text-secondary" if not linha.chave else "" %}
+          <tr class="{{ 'table-success fw-semibold' if linha.melhor }}">
+            <td class="{{ cor }}">
+              {% if linha.chave %}
+              <a href="{{ url_for('modelos.index', modelo=linha.chave, _anchor='resultados') }}">{{ linha.nome }}</a>
+              {% else %}
+              {{ linha.nome }}
+              {% endif %}
+              {% if linha.melhor %}<span class="badge text-bg-success ms-1">melhor</span>{% endif %}
+            </td>
+            <td class="text-end {{ cor }}">{{ pct(linha.acuracia_treino) if linha.acuracia_treino is not none else "—" }}</td>
+            <td class="text-end {{ cor }}">{{ pct(linha.acuracia_teste) }}</td>
+            <td class="text-end {{ cor }}">{{ linha.f1_macro | numero(2) if linha.f1_macro is not none else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="small text-secondary mt-2 mb-0">Em destaque, o modelo com a maior acurácia de teste.</p>
+  </div>
+</section>
+
+{% set predicao = resultados.predicao_exemplo %}
+<section class="card">
+  <div class="card-body">
+    <h2 class="h5 card-title">Predição</h2>
+    <p class="text-secondary small">Informe os indicadores de um município para prever o partido vencedor.</p>
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <form class="row g-3">
+          {% for coluna in resultados.variaveis %}
+          <div class="col-sm-6 col-md-4 d-flex flex-column">
+            <label for="pred_{{ coluna }}" class="form-label small">{{ rotulos[coluna] }}</label>
+            <input type="number" class="form-control mt-auto" id="pred_{{ coluna }}" name="{{ coluna }}"
+                   step="any" value="{{ predicao.entrada[coluna] }}">
+          </div>
+          {% endfor %}
+          <div class="col-12">
+            <button type="button" class="btn btn-primary" disabled>Prever</button>
+            <span class="form-text ms-2">Disponível na entrega final.</span>
+          </div>
+        </form>
+      </div>
+      <div class="col-lg-4">
+        <div class="card h-100 text-center bg-body-tertiary">
+          <div class="card-body d-flex flex-column justify-content-center">
+            <div class="text-secondary small mb-1">Resultado de exemplo · {{ modelos[predicao.modelo] }}</div>
+            <p class="fs-5 mb-0">
+              Partido previsto: <strong>{{ predicao.partido_previsto }}</strong> —
+              {{ (predicao.probabilidade * 100) | numero }}% de probabilidade (exemplo)
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Mostra só o fieldset de parâmetros do modelo escolhido no select
+  const seletorModelo = document.getElementById("modelo");
+  seletorModelo.addEventListener("change", () => {
+    document.querySelectorAll("[data-parametros]").forEach((fieldset) => {
+      fieldset.hidden = fieldset.dataset.parametros !== seletorModelo.value;
+    });
+  });
+</script>
 {% endblock %}
