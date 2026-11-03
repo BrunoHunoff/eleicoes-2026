@@ -1,0 +1,167 @@
+{
+  "aviso": "Resultados ilustrativos para a apresentação do front-end. Não foram gerados por treino na aplicação.",
+  "base": "municipios_2026.csv",
+  "treinado_em": "2026-11-03 15:00",
+  "tamanho_teste": 0.2,
+  "classes": [
+    "PT",
+    "PL"
+  ],
+  "variaveis": [
+    "populacao",
+    "pib_per_capita",
+    "pct_feminino",
+    "pct_16_29",
+    "pct_60_mais",
+    "pct_ensino_superior",
+    "pct_ate_fundamental",
+    "pct_abstencao",
+    "pct_brancos_nulos"
+  ],
+  "baseline": {
+    "nome": "Baseline (classe mais frequente)",
+    "acuracia_teste": 0.51
+  },
+  "modelos": {
+    "arvore": {
+      "nome": "Árvore de Decisão",
+      "parametros": {
+        "max_depth": 5,
+        "min_samples_split": 2
+      },
+      "acuracia_treino": 0.89,
+      "acuracia_teste": 0.79,
+      "f1_macro": 0.78,
+      "relatorio": {
+        "PT": {
+          "precisao": 0.85,
+          "recall": 0.68,
+          "f1": 0.76,
+          "suporte": 98
+        },
+        "PL": {
+          "precisao": 0.74,
+          "recall": 0.88,
+          "f1": 0.81,
+          "suporte": 102
+        }
+      },
+      "matriz_confusao": [
+        [
+          67,
+          31
+        ],
+        [
+          12,
+          90
+        ]
+      ],
+      "importancia_variaveis": {
+        "pib_per_capita": 0.68,
+        "pct_ate_fundamental": 0.15,
+        "pct_16_29": 0.05,
+        "pct_abstencao": 0.04,
+        "pct_60_mais": 0.03,
+        "populacao": 0.03,
+        "pct_feminino": 0.01,
+        "pct_ensino_superior": 0.0,
+        "pct_brancos_nulos": 0.0
+      }
+    },
+    "knn": {
+      "nome": "KNN",
+      "parametros": {
+        "n_neighbors": 5,
+        "weights": "uniform"
+      },
+      "acuracia_treino": 0.86,
+      "acuracia_teste": 0.83,
+      "f1_macro": 0.83,
+      "relatorio": {
+        "PT": {
+          "precisao": 0.87,
+          "recall": 0.79,
+          "f1": 0.82,
+          "suporte": 98
+        },
+        "PL": {
+          "precisao": 0.81,
+          "recall": 0.88,
+          "f1": 0.85,
+          "suporte": 102
+        }
+      },
+      "matriz_confusao": [
+        [
+          77,
+          21
+        ],
+        [
+          12,
+          90
+        ]
+      ],
+      "importancia_variaveis": null
+    },
+    "logistica": {
+      "nome": "Regressão Logística",
+      "parametros": {
+        "C": 1.0
+      },
+      "acuracia_treino": 0.85,
+      "acuracia_teste": 0.85,
+      "f1_macro": 0.85,
+      "relatorio": {
+        "PT": {
+          "precisao": 0.89,
+          "recall": 0.81,
+          "f1": 0.84,
+          "suporte": 98
+        },
+        "PL": {
+          "precisao": 0.83,
+          "recall": 0.9,
+          "f1": 0.86,
+          "suporte": 102
+        }
+      },
+      "matriz_confusao": [
+        [
+          79,
+          19
+        ],
+        [
+          10,
+          92
+        ]
+      ],
+      "importancia_variaveis": {
+        "pib_per_capita": 0.37,
+        "pct_ate_fundamental": 0.3,
+        "pct_16_29": 0.2,
+        "pct_feminino": 0.03,
+        "pct_brancos_nulos": 0.03,
+        "pct_60_mais": 0.03,
+        "populacao": 0.02,
+        "pct_abstencao": 0.02,
+        "pct_ensino_superior": 0.0
+      }
+    }
+  },
+  "predicao_exemplo": {
+    "modelo": "logistica",
+    "entrada": {
+      "populacao": 18500,
+      "pib_per_capita": 16800.0,
+      "pct_feminino": 52.1,
+      "pct_16_29": 24.5,
+      "pct_60_mais": 19.8,
+      "pct_ensino_superior": 7.2,
+      "pct_ate_fundamental": 61.4,
+      "pct_abstencao": 19.5,
+      "pct_brancos_nulos": 4.3
+    },
+    "partido_previsto": "PT",
+    "probabilidade": 0.95
+  }
+}
