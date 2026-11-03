@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Dados brutos (grandes demais para o repositório)
+data/raw/
+*.zip
+
+# Modelos treinados
+*.joblib
+
+# Sistema / editores
+.DS_Store
+.vscode/
+.idea/
