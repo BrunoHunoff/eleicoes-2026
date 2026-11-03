@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 plt.switch_backend("Agg")
 
 
+def formatar_numero(valor, casas=0):
+    """Formata um número no padrão brasileiro (ex.: 1.234.567,89). Registrado nos templates como o filtro "numero"."""
+    texto = f"{valor:,.{casas}f}"
+    return texto.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
 def figura_para_base64(fig):
     """Converte uma figura do matplotlib/seaborn em PNG (base64) para exibir em uma tag <img>."""
     buffer = io.BytesIO()

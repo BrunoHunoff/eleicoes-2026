@@ -4,5 +4,120 @@
 
 {% block conteudo %}
 <h1 class="h3">Dados</h1>
-<p class="text-secondary">Em construção.</p>
+<p class="text-secondary">
+  Uma linha por município, com o perfil do eleitorado, a participação, indicadores socioeconômicos
+  e o resultado do 2º turno presidencial.
+</p>
+
+<div class="alert alert-info" role="alert">
+  Base de exemplo com <strong>dados fictícios</strong>, no mesmo formato da base real (TSE + IBGE).
+</div>
+
+<section class="card mb-4">
+  <div class="card-body">
+    <h2 class="h5 card-title">Enviar base</h2>
+    <form class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label for="arquivo" class="form-label">Arquivo da base (.csv, .json ou .xml)</label>
+        <input class="form-control" type="file" id="arquivo" accept=".csv,.json,.xml" disabled>
+      </div>
+      <div class="col-md-4">
+        <button type="button" class="btn btn-primary w-100" disabled>Enviar base</button>
+      </div>
+    </form>
+    <p class="form-text mb-0">
+      Disponível na entrega final. O arquivo deve ter as colunas do dicionário abaixo;
+      ao enviar uma nova base, gráficos e modelos passam a usá-la.
+    </p>
+  </div>
+</section>
+
+<section class="row g-3 mb-4">
+  {% set cards = [
+    ("Municípios", resumo.municipios | numero),
+    ("Eleitores", resumo.eleitores | numero),
+    ("UFs", resumo.ufs),
+    ("Colunas", resumo.colunas),
+    ("Ano", resumo.anos | join(", ")),
+  ] %}
+  {% for titulo, valor in cards %}
+  <div class="col-6 col-md">
+    <div class="card h-100 text-center">
+      <div class="card-body">
+        <div class="text-secondary small">{{ titulo }}</div>
+        <div class="fs-4 fw-semibold">{{ valor }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="card mb-4">
+  <div class="card-body">
+    <h2 class="h5 card-title">Dicionário de dados</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr><th>Coluna</th><th>Descrição</th><th>Fonte</th></tr>
+        </thead>
+        <tbody>
+          {% for item in dicionario %}
+          <tr>
+            <td><code>{{ item.coluna }}</code></td>
+            <td>{{ item.descricao }}</td>
+            <td>
+              <span class="badge {{ 'text-bg-primary' if item.fonte == 'TSE' else 'text-bg-success' }}">{{ item.fonte }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card mb-4">
+  <div class="card-body">
+    <h2 class="h5 card-title">Amostra da base</h2>
+    <p class="text-secondary small">Primeiras {{ linhas_amostra | length }} linhas.</p>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped small text-nowrap mb-0">
+        <thead>
+          <tr>{% for coluna in colunas_amostra %}<th>{{ coluna }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas_amostra %}
+          <tr>{% for valor in linha %}<td>{{ valor }}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-body">
+    <h2 class="h5 card-title">Estatísticas dos indicadores</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle text-nowrap mb-0">
+        <thead>
+          <tr>
+            <th>Indicador</th><th class="text-end">Média</th><th class="text-end">Desvio padrão</th>
+            <th class="text-end">Mínimo</th><th class="text-end">Mediana</th><th class="text-end">Máximo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in estatisticas %}
+          <tr>
+            <td>{{ linha.rotulo }}</td>
+            {% for campo in ["media", "desvio", "minimo", "mediana", "maximo"] %}
+            <td class="text-end">{{ linha[campo] | numero(2) }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 {% endblock %}
