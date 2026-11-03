@@ -1,15 +1,15 @@
 # Python
 __pycache__/
 *.py[cod]
-.venv/
 venv/
+.venv/
+.env
+instance/
 .ipynb_checkpoints/
 
-# Streamlit
-.streamlit/secrets.toml
-
-# Dados brutos (grandes demais para o repositório)
+# Dados brutos e bases enviadas pelo usuário
 data/raw/
+data/uploads/
 *.zip
 
 # Modelos treinados

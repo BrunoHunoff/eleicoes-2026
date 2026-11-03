@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="mb-4">
+  <h1 class="h2">Análise de dados das Eleições</h1>
+  <p class="lead text-secondary">
+    Carregue uma base de municípios, explore os resultados com gráficos e mapas
+    e treine modelos para prever o partido vencedor no 2º turno.
+  </p>
+</section>
+
+<div class="row g-3">
+  {% set secoes = [
+    ("dados.index", "Dados", "Envie um arquivo .csv, .json ou .xml e confira as colunas e o resumo da base."),
+    ("analise.index", "Análise", "Gráficos de distribuição, correlação entre variáveis e mapa por estado."),
+    ("modelos.index", "Modelos", "Escolha o classificador, ajuste os parâmetros, treine e faça predições."),
+  ] %}
+  {% for endpoint, titulo, descricao in secoes %}
+  <div class="col-md-4">
+    <a class="card h-100 card-secao text-decoration-none" href="{{ url_for(endpoint) }}">
+      <div class="card-body">
+        <h2 class="h5 card-title">{{ titulo }}</h2>
+        <p class="card-text text-secondary">{{ descricao }}</p>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
