@@ -1,9 +1,15 @@
+import matplotlib.pyplot as plt
 import plotly.express as px
+import seaborn as sns
 
-from app.services.dados_service import REGIOES, ROTULOS
+from app.services.dados_service import COLUNAS_NUMERICAS, REGIOES, ROTULOS
+from app.utils import figura_para_base64
 
 # Cores fixas: cada partido tem a mesma cor em todos os gráficos
 CORES_PARTIDOS = {"PT": "#c4122d", "PL": "#1d4e9e"}
+
+# Paleta das regiões sem vermelho e azul fortes, para não confundir região com partido
+CORES_REGIOES = dict(zip(REGIOES, px.colors.qualitative.Dark2))
 
 # Mesma ordem de partidos e regiões em todas as legendas e eixos
 ORDEM_CATEGORIAS = {"vencedor": list(CORES_PARTIDOS), "regiao": REGIOES}
@@ -12,6 +18,8 @@ ORDEM_CATEGORIAS = {"vencedor": list(CORES_PARTIDOS), "regiao": REGIOES}
 ROTULOS_GRAFICOS = {**ROTULOS, "municipios": "Municípios"}
 
 ALTURA_GRAFICO = 400
+ALTURA_MAPA = 550
+CENTRO_BRASIL = {"lat": -14.2, "lon": -51.9}
 
 
 def figura_para_html(fig):
@@ -78,3 +86,45 @@ def grafico_histograma(df, coluna):
         hovertemplate=f"{ROTULOS_GRAFICOS[coluna]}=%{{x}}<br>Municípios=%{{y}}<extra>%{{fullData.name}}</extra>",
     )
     return figura_para_html(fig)
+
+
+def grafico_dispersao(df, coluna):
+    """Dispersão da coluna escolhida (eixo x) com o % de votos no PT (eixo y), um ponto por município."""
+    fig = px.scatter(
+        df, x=coluna, y="pct_votos_pt", color="regiao", opacity=0.7,
+        hover_name="nm_municipio", hover_data={"sg_uf": True},
+        color_discrete_map=CORES_REGIOES, category_orders=ORDEM_CATEGORIAS, labels=ROTULOS_GRAFICOS,
+        height=ALTURA_GRAFICO,
+    )
+    return figura_para_html(fig)
+
+
+def mapa_municipios(df):
+    """Mapa com um ponto por município: cor pelo partido vencedor e tamanho pelo número de eleitores."""
+    fig = px.scatter_map(
+        df, lat="latitude", lon="longitude", color="vencedor", size="qt_eleitores",
+        hover_name="nm_municipio",
+        hover_data={
+            "sg_uf": True, "pct_votos_pt": ":.1f", "pct_votos_pl": ":.1f", "qt_eleitores": ":,",
+            "latitude": False, "longitude": False,
+        },
+        color_discrete_map=CORES_PARTIDOS, category_orders=ORDEM_CATEGORIAS, labels=ROTULOS_GRAFICOS,
+        map_style="carto-positron", zoom=3, center=CENTRO_BRASIL, height=ALTURA_MAPA,
+    )
+    return figura_para_html(fig)
+
+
+def mapa_calor_correlacao(df):
+    """Mapa de calor (seaborn) da correlação entre os indicadores numéricos, em base64."""
+    correlacao = df[COLUNAS_NUMERICAS].corr()
+    rotulos = [ROTULOS[coluna] for coluna in COLUNAS_NUMERICAS]
+
+    fig, ax = plt.subplots(figsize=(11, 8))
+    # vmin/vmax fixos: o branco fica sempre no zero e as cores são comparáveis entre bases diferentes
+    sns.heatmap(
+        correlacao, annot=True, fmt=".2f", cmap="coolwarm", vmin=-1, vmax=1,
+        xticklabels=rotulos, yticklabels=rotulos, ax=ax,
+    )
+    ax.tick_params(axis="x", rotation=45)
+    plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+    return figura_para_base64(fig)
