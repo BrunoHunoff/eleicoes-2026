@@ -1,11 +1,4 @@
-"""Gera as bases fictícias (mock) de municípios usadas no protótipo do front-end.
-
-As colunas são as mesmas da base real (TSE + IBGE), mas os valores são sorteados com
-relações plausíveis entre si, para que os gráficos e os modelos tenham padrões a mostrar.
-Os mesmos municípios aparecem nas duas eleições, com pequenas variações entre os anos.
-
-Uso: python scripts/gerar_mock.py
-"""
+"""Gera as bases fictícias (mock) de 2022 e 2026, com as colunas da base real e valores sorteados."""
 from pathlib import Path
 
 import numpy as np
@@ -22,8 +15,7 @@ COLUNAS = [
     "pct_votos_pt", "pct_votos_pl", "vencedor",
 ]
 
-# UF: (código IBGE, região, latitude e longitude aproximadas do centro, espalhamento em graus,
-# número real de municípios — usado como peso no sorteio)
+# UF: (código IBGE, região, latitude e longitude do centro, espalhamento em graus, nº real de municípios)
 UFS = {
     "RO": (11, "Norte", -10.9, -62.8, 2.0, 52),
     "AC": (12, "Norte", -9.0, -70.5, 1.5, 22),

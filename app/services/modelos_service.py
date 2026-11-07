@@ -104,7 +104,7 @@ def grafico_importancia(importancias):
     fig, ax = plt.subplots(figsize=(5.5, 4.5))
     sns.barplot(x=valores, y=rotulos, color="#0d6efd", ax=ax)
     ax.bar_label(ax.containers[0], labels=[formatar_numero(valor, 2) for valor in valores], padding=3)
-    ax.xaxis.set_major_formatter(lambda valor, _: formatar_numero(valor, 2))
+    ax.set_xticks([])
     ax.margins(x=0.12)
     ax.set_xlabel("Importância")
     ax.set_ylabel("")

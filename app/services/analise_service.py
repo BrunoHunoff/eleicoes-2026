@@ -82,9 +82,7 @@ def grafico_histograma(df, coluna):
     )
     fig.update_layout(yaxis_title="Municípios")
     # O labels não renomeia o "count" do hover do histograma, por isso o texto do hover é montado aqui
-    fig.update_traces(
-        hovertemplate=f"{ROTULOS_GRAFICOS[coluna]}=%{{x}}<br>Municípios=%{{y}}<extra>%{{fullData.name}}</extra>",
-    )
+    fig.update_traces(hovertemplate=ROTULOS_GRAFICOS[coluna] + "=%{x}<br>Municípios=%{y}")
     return figura_para_html(fig)
 
 
@@ -125,6 +123,5 @@ def mapa_calor_correlacao(df):
         correlacao, annot=True, fmt=".2f", cmap="coolwarm", vmin=-1, vmax=1,
         xticklabels=rotulos, yticklabels=rotulos, ax=ax,
     )
-    ax.tick_params(axis="x", rotation=45)
-    plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+    ax.set_xticklabels(rotulos, rotation=45, ha="right")
     return figura_para_base64(fig)
