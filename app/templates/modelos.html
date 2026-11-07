@@ -251,9 +251,9 @@
               {% endif %}
               {% if linha.melhor %}<span class="badge text-bg-success ms-1">melhor</span>{% endif %}
             </td>
-            <td class="text-end {{ cor }}">{{ pct(linha.acuracia_treino) if linha.acuracia_treino is not none else "—" }}</td>
+            <td class="text-end {{ cor }}">{{ pct(linha.acuracia_treino) if linha.acuracia_treino is not none else "-" }}</td>
             <td class="text-end {{ cor }}">{{ pct(linha.acuracia_teste) }}</td>
-            <td class="text-end {{ cor }}">{{ linha.f1_macro | numero(2) if linha.f1_macro is not none else "—" }}</td>
+            <td class="text-end {{ cor }}">{{ linha.f1_macro | numero(2) if linha.f1_macro is not none else "-" }}</td>
           </tr>
           {% endfor %}
         </tbody>
