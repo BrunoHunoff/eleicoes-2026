@@ -17,7 +17,10 @@
       </button>
       <div class="collapse navbar-collapse" id="menu">
         <ul class="navbar-nav">
-          {% for endpoint, rotulo in [("dados.index", "Dados"), ("analise.index", "Análise"), ("modelos.index", "Modelos")] %}
+          {% for endpoint, rotulo in [
+            ("dados.index", "Dados"), ("analise.index", "Análise"), ("modelos.index", "Modelos"),
+            ("predicao.index", "Predição"),
+          ] %}
           <li class="nav-item">
             <a class="nav-link {% if request.endpoint == endpoint %}active{% endif %}"
                href="{{ url_for(endpoint) }}">{{ rotulo }}</a>

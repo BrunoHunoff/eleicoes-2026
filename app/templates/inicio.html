@@ -13,10 +13,11 @@
   {% set secoes = [
     ("dados.index", "Dados", "Envie um arquivo .csv, .json ou .xml e confira as colunas e o resumo da base."),
     ("analise.index", "Análise", "Gráficos de distribuição, correlação entre variáveis e mapa dos municípios."),
-    ("modelos.index", "Modelos", "Escolha o classificador, ajuste os parâmetros, treine e faça predições."),
+    ("modelos.index", "Modelos", "Escolha o classificador, ajuste os parâmetros, treine e compare os modelos."),
+    ("predicao.index", "Predição", "Preveja o vencedor em um ou vários municípios e compare com o resultado real."),
   ] %}
   {% for endpoint, titulo, descricao in secoes %}
-  <div class="col-md-4">
+  <div class="col-md-6 col-lg-3">
     <a class="card h-100 card-secao text-decoration-none" href="{{ url_for(endpoint) }}">
       <div class="card-body">
         <h2 class="h5 card-title">{{ titulo }}</h2>

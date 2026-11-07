@@ -30,7 +30,7 @@
         "min_samples_split": 2
       },
       "acuracia_treino": 0.89,
-      "acuracia_teste": 0.79,
+      "acuracia_teste": 0.785,
       "f1_macro": 0.78,
       "relatorio": {
         "PT": {
@@ -75,7 +75,7 @@
         "weights": "uniform"
       },
       "acuracia_treino": 0.86,
-      "acuracia_teste": 0.83,
+      "acuracia_teste": 0.835,
       "f1_macro": 0.83,
       "relatorio": {
         "PT": {
@@ -109,7 +109,7 @@
         "C": 1.0
       },
       "acuracia_treino": 0.85,
-      "acuracia_teste": 0.85,
+      "acuracia_teste": 0.855,
       "f1_macro": 0.85,
       "relatorio": {
         "PT": {
