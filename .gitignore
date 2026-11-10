@@ -12,8 +12,10 @@ data/raw/
 data/uploads/
 *.zip
 
-# Modelos treinados
+# Modelos treinados e predições (a aplicação recria sozinha)
 *.joblib
+data/modelos/
+data/predicoes/
 
 # Sistema / editores
 .DS_Store

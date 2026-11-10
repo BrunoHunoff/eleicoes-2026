@@ -190,13 +190,15 @@ Uso do modelo treinado:
 
 **Modelos e parâmetros.** Cada modelo fica num `Pipeline` com `StandardScaler`, que coloca as variáveis na mesma escala. Isso é importante para o KNN, que mede distâncias.
 
-| Modelo | Parâmetros ajustáveis |
+| Modelo | Parâmetros ajustáveis (faixa · padrão) |
 |---|---|
-| Árvore de Decisão | `max_depth` (profundidade máxima) e `min_samples_split` (mínimo de amostras para dividir um nó) |
-| KNN | `n_neighbors` (número de vizinhos) e `weights` (vizinhos com peso igual ou pela distância) |
-| Regressão Logística | `C` (inverso da regularização: quanto menor, mais simples o modelo) |
+| Árvore de Decisão | `max_depth`, profundidade máxima (1 a 30 ou vazio = sem limite · 5) e `min_samples_split`, mínimo de amostras para dividir um nó (2 a 50 · 2) |
+| KNN | `n_neighbors`, número de vizinhos (1 a 50 · 5) e `weights`, vizinhos com peso igual ou pela distância (· `uniform`) |
+| Regressão Logística | `C`, inverso da regularização: quanto menor, mais simples o modelo (0,01 a 100 · 1,0) |
 
-**Treino e teste.** A base é dividida com `train_test_split` estratificado: a proporção de PT e PL é a mesma nos dois conjuntos. O tamanho do teste vai de 10% a 40%. Os três modelos usam a mesma divisão, então a comparação entre eles é justa.
+**Treino e teste.** A base é dividida com `train_test_split` estratificado: a proporção de PT e PL é a mesma nos dois conjuntos. O tamanho do teste vai de 10% a 40% (padrão 20%). O botão **Treinar** treina os três modelos de uma vez, com a mesma divisão (`random_state=42`), então a comparação entre eles é justa. O formulário sempre mostra a configuração do último treino.
+
+**Primeiro acesso.** Se ainda não existe nenhum treino, a aplicação treina sozinha com a configuração padrão (7 variáveis e os parâmetros da tabela). Assim as páginas Modelos e Predição nunca ficam sem modelo.
 
 **Métricas.**
 - **Acurácia de treino e de teste.** Uma diferença acima de 5 pontos percentuais indica possível *overfitting* (o modelo decorou o treino).
@@ -208,16 +210,25 @@ Uso do modelo treinado:
   - KNN: não tem importância por variável.
 - **Baseline**: um `DummyClassifier` que sempre chuta o partido mais frequente. Um modelo só é útil se ficar acima dele.
 
-**Re-treino.** O botão **Re-treinar** treina de novo com os mesmos parâmetros e variáveis, usando a base atual. Quando uma base nova é enviada, a página Modelos avisa que o treino está desatualizado.
+**Re-treino.** O botão **Re-treinar** treina de novo com os mesmos parâmetros e variáveis, usando a base atual. É o treinamento dinâmico do enunciado. Quando uma base nova é enviada, as páginas Modelos e Predição avisam que o treino está desatualizado.
 
 **Predição.**
 - O modelo devolve a **probabilidade** de cada partido. O previsto é o de maior probabilidade.
 - *"72% de chance"* quer dizer que, entre municípios parecidos com esse, cerca de 7 em cada 10 votaram nesse partido. **É a melhor aposta com base no padrão, não uma certeza.**
 - Nos agrupamentos por região e UF aparecem a probabilidade média e o **% do eleitorado** nos municípios previstos para cada partido. Uma cidade grande pesa mais que várias pequenas.
 
+**Lista de municípios previstos.**
+- **Um município**: nome, UF e as variáveis do último treino. Os valores iniciais do formulário são a mediana de cada variável na base atual. A região vem da UF. Como não tem latitude, longitude nem número de eleitores, o município aparece nas tabelas e no mapa por estado, mas não no mapa por município nem no % do eleitorado.
+- **Vários municípios**: arquivo .csv, .json ou .xml com `nm_municipio`, `sg_uf` e as variáveis do último treino. As outras colunas são opcionais. Linhas sem algum desses dados ou com UF inválida são ignoradas, e a mensagem informa quantas.
+- Cada predição guarda o município, o modelo usado, a data, o partido previsto e a probabilidade do PT. Se o mesmo município (nome + UF) for previsto de novo, a linha é **atualizada**, não repetida.
+- A lista pode ser baixada em CSV (**Baixar CSV**) ou apagada (**Limpar lista**). Para testar o envio, use `data/exemplos/municipios_para_prever.csv` (30 municípios da base de 2022, sem as colunas de resultado).
+
 **Por que a comparação real × previsto usa só os municípios de teste.** Os municípios usados no treino já foram "vistos" pelo modelo. Medir o acerto neles daria uma nota inflada, como fazer a prova com o gabarito.
 
-**Arquivos gerados.** Os modelos treinados (`.joblib`), os resultados do treino e a lista de predições ficam em `data/modelos/` e `data/predicoes/`. A base enviada fica em `data/uploads/`. Essas pastas estão no `.gitignore`, porque a aplicação recria tudo sozinha.
+**Arquivos gerados.** Essas pastas estão no `.gitignore`, porque a aplicação recria tudo sozinha.
+- `data/modelos/`: `resultados.json` (métricas e configuração do último treino), um `.joblib` por modelo (`arvore`, `knn`, `logistica`) e `predicoes_teste.csv` (previsões nos municípios de teste, usadas no real × previsto).
+- `data/predicoes/salvas.csv`: a lista de municípios previstos.
+- `data/uploads/`: a base enviada.
 
 ---
 
@@ -247,7 +258,7 @@ eleicoes-2026/
 │   └── static/css/         # Estilos próprios
 ├── data/
 │   ├── mock/               # Bases de exemplo fictícias (2022 e 2026)
-│   ├── exemplos/           # A base de 2022 em .json e .xml, para testar os outros formatos
+│   ├── exemplos/           # A base de 2022 em .json e .xml e municípios para testar a predição
 │   ├── geo/                # Contorno dos estados (malha do IBGE) para o mapa por estado
 │   ├── uploads/            # Base enviada pelo usuário (criada pela aplicação, fora do git)
 │   ├── modelos/            # Modelos treinados e resultados (criada pela aplicação, fora do git)
@@ -294,7 +305,7 @@ Navegador ──► routes/ ──► services/ ──► (pandas, scikit-learn,
 - **Comparação justa.** Real × previsto só nos municípios de teste. Os três modelos usam a mesma divisão treino/teste.
 - **Baseline.** Toda acurácia é comparada com a de um modelo que sempre chuta o partido mais frequente.
 - **Agrupamento ponderado.** Por região e UF, além da média das probabilidades, aparece o % do eleitorado, porque uma cidade grande pesa mais que várias pequenas.
-- **Mapa por estado com código IBGE.** Os 2 primeiros dígitos do código do município são o código do estado. É assim que cada município é ligado ao contorno do seu estado.
+- **Mapa por estado com código IBGE.** Cada estado do contorno é identificado pelo código IBGE da UF. O código vem da sigla da UF (tabela `UFS` em `predicao_service`), e não do código do município, porque municípios digitados não têm código IBGE.
 - **Código simples.** Funções curtas e comentários de no máximo uma linha, para que qualquer membro da equipe consiga explicar qualquer parte.
 
 ---

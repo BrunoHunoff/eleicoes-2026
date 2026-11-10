@@ -12,14 +12,16 @@
   do eleitorado, da participação e de indicadores socioeconômicos.
 </p>
 
-<div class="alert alert-info" role="alert">{{ resultados.aviso }}</div>
+{% if base_mudou %}
+<div class="alert alert-warning" role="alert">A base mudou desde o último treino. Clique em Re-treinar.</div>
+{% endif %}
 
 <div class="row g-4 mb-4">
   <div class="col-lg-4">
     <section class="card">
       <div class="card-body">
         <h2 class="h5 card-title">Configuração do treino</h2>
-        <form>
+        <form method="post" action="{{ url_for('modelos.treinar') }}">
           <div class="mb-3">
             <label for="modelo" class="form-label">Modelo</label>
             <select class="form-select" id="modelo" name="modelo">
@@ -35,7 +37,7 @@
             <div class="mb-2">
               <label for="max_depth" class="form-label">Profundidade máxima (<code>max_depth</code>)</label>
               <input type="number" class="form-control" id="max_depth" name="max_depth"
-                     min="1" max="30" value="{{ arvore.max_depth }}" placeholder="Sem limite">
+                     min="1" max="30" value="{{ arvore.max_depth if arvore.max_depth is not none }}" placeholder="Sem limite">
               <div class="form-text">De 1 a 30; vazio = sem limite.</div>
             </div>
             <div>
@@ -86,16 +88,19 @@
 
           <fieldset class="mb-3">
             <legend class="fs-6 fw-semibold">Variáveis preditoras</legend>
-            {% for coluna in resultados.variaveis %}
+            {% for coluna in variaveis %}
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="var_{{ coluna }}" name="variaveis" value="{{ coluna }}" checked>
+              <input class="form-check-input" type="checkbox" id="var_{{ coluna }}" name="variaveis" value="{{ coluna }}"
+                     {% if coluna in resultados.variaveis %}checked{% endif %}>
               <label class="form-check-label" for="var_{{ coluna }}">{{ rotulos[coluna] }}</label>
             </div>
             {% endfor %}
+            <div class="form-text">
+              Abstenção e brancos e nulos só são conhecidos depois da eleição; por isso ficam desmarcadas por padrão.
+            </div>
           </fieldset>
 
-          <button type="button" class="btn btn-primary w-100" disabled>Treinar</button>
-          <p class="form-text text-center mb-0">Disponível na entrega final.</p>
+          <button type="submit" class="btn btn-primary w-100">Treinar</button>
         </form>
       </div>
     </section>
@@ -207,16 +212,20 @@
           <dt class="col-sm-4">Tamanho do teste</dt>
           <dd class="col-sm-8">{{ (resumo.tamanho_teste * 100) | numero }}% ({{ resumo.municipios_teste | numero }} municípios)</dd>
           <dt class="col-sm-4">Parâmetros</dt>
-          <dd class="col-sm-8 mb-0">
+          <dd class="col-sm-8">
             {% for nome, valor in resumo.parametros.items() %}
-            <code>{{ nome }}</code> = {{ valor }}{% if not loop.last %}, {% endif %}
+            <code>{{ nome }}</code> = {{ "sem limite" if valor is none else valor }}{% if not loop.last %}, {% endif %}
             {% endfor %}
           </dd>
+          <dt class="col-sm-4">Variáveis</dt>
+          <dd class="col-sm-8 mb-0">{{ resumo.variaveis | join(", ") }}</dd>
         </dl>
-        <button type="button" class="btn btn-outline-primary" disabled>Re-treinar</button>
+        <form method="post" action="{{ url_for('modelos.retreinar') }}">
+          <input type="hidden" name="modelo" value="{{ modelo_atual }}">
+          <button type="submit" class="btn btn-outline-primary">Re-treinar</button>
+        </form>
         <p class="form-text mb-0">
-          Disponível na entrega final: quando uma nova base for enviada na página Dados,
-          o modelo poderá ser re-treinado com os novos dados.
+          Treina de novo os três modelos com os mesmos parâmetros e variáveis, usando a base atual da página Dados.
         </p>
       </div>
     </section>
