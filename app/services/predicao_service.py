@@ -1,22 +1,46 @@
 import json
+from datetime import datetime
+from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 import plotly.express as px
 
+from app.services import dados_service
 from app.services.analise_service import (
     ALTURA_GRAFICO, ALTURA_MAPA, CENTRO_BRASIL, CORES_PARTIDOS, ORDEM_CATEGORIAS, ROTULOS_GRAFICOS,
     contar_municipios, figura_para_html,
 )
-from app.services.dados_service import PASTA_MOCK, carregar_base_atual
+from app.services.dados_service import PASTA_MOCK, ROTULOS, carregar_base_atual
+from app.services.modelos_service import (
+    ARQUIVO_PREDICOES_TESTE, caminho_modelo, carregar_resultados, probabilidade_pt,
+)
 
-PREDICOES_SALVAS_MOCK = PASTA_MOCK / "predicoes_salvas.csv"
-PREDICOES_TESTE_MOCK = PASTA_MOCK / "predicoes_teste.csv"
+PASTA_PREDICOES = Path(__file__).resolve().parents[2] / "data" / "predicoes"
+ARQUIVO_PREDICOES_SALVAS = PASTA_PREDICOES / "salvas.csv"
 # Contorno dos 27 estados (malha do IBGE); cada estado é identificado pelo código IBGE da UF
 CONTORNO_ESTADOS = PASTA_MOCK.parent / "geo" / "estados.json"
 
-# A lista de municípios previstos só usa os dados do município, sem nenhuma coluna de resultado
+# Dados do município guardados na lista de previstos, sem nenhuma coluna de resultado
 COLUNAS_MUNICIPIO = ["cd_municipio", "nm_municipio", "sg_uf", "regiao", "latitude", "longitude", "qt_eleitores"]
+COLUNAS_SALVAS = COLUNAS_MUNICIPIO + ["modelo", "previsto_em", "previsto", "prob_pt"]
+COLUNAS_OBRIGATORIAS = ["nm_municipio", "sg_uf"]
+
+# sigla: (código IBGE da UF, região)
+UFS = {
+    "RO": ("11", "Norte"), "AC": ("12", "Norte"), "AM": ("13", "Norte"), "RR": ("14", "Norte"),
+    "PA": ("15", "Norte"), "AP": ("16", "Norte"), "TO": ("17", "Norte"),
+    "MA": ("21", "Nordeste"), "PI": ("22", "Nordeste"), "CE": ("23", "Nordeste"), "RN": ("24", "Nordeste"),
+    "PB": ("25", "Nordeste"), "PE": ("26", "Nordeste"), "AL": ("27", "Nordeste"), "SE": ("28", "Nordeste"),
+    "BA": ("29", "Nordeste"),
+    "MG": ("31", "Sudeste"), "ES": ("32", "Sudeste"), "RJ": ("33", "Sudeste"), "SP": ("35", "Sudeste"),
+    "PR": ("41", "Sul"), "SC": ("42", "Sul"), "RS": ("43", "Sul"),
+    "MS": ("50", "Centro-Oeste"), "MT": ("51", "Centro-Oeste"), "GO": ("52", "Centro-Oeste"),
+    "DF": ("53", "Centro-Oeste"),
+}
+CODIGOS_UF = {sigla: codigo for sigla, (codigo, _) in UFS.items()}
+REGIOES_UF = {sigla: regiao for sigla, (_, regiao) in UFS.items()}
 
 CORES_RESULTADO = {"Acertou": "#198754", "Errou": "#fd7e14"}
 # Escala do mapa: azul do PL (probabilidade do PT = 0), cinza (empate) e vermelho do PT (probabilidade do PT = 1)
@@ -47,26 +71,154 @@ ROTULOS_PREDICAO = {
 }
 
 
-def carregar_predicoes_salvas_mock():
-    """Lista fictícia de municípios já previstos, junto com os dados de cada município."""
-    salvas = pd.read_csv(PREDICOES_SALVAS_MOCK)
-    salvas["previsto_em"] = pd.to_datetime(salvas["previsto_em"]).dt.strftime("%d/%m/%Y %H:%M")
-    salvas["prob_previsto"] = np.where(salvas["previsto"] == "PT", salvas["prob_pt"], 1 - salvas["prob_pt"])
-    df = salvas.merge(carregar_base_atual()[COLUNAS_MUNICIPIO], on="cd_municipio")
+def carregar_modelo(chave):
+    """Carrega o pipeline treinado do modelo escolhido; se ainda não houve treino, treina antes."""
+    if not caminho_modelo(chave).exists():
+        carregar_resultados()
+    return joblib.load(caminho_modelo(chave))
+
+
+def prever(df, chave):
+    """Devolve o DataFrame com o partido previsto, a probabilidade do PT, o modelo usado e a data da predição."""
+    modelo = carregar_modelo(chave)
+    variaveis = carregar_resultados()["variaveis"]
+    df = df.copy()
+    df["previsto"] = modelo.predict(df[variaveis])
+    df["prob_pt"] = probabilidade_pt(modelo, df[variaveis]).round(3)
+    df["modelo"] = chave
+    df["previsto_em"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    return df
+
+
+def completar_colunas(df):
+    """Cria as colunas opcionais que faltarem: a região vem da UF e as outras ficam vazias."""
+    df = df.copy()
+    if "regiao" not in df.columns:
+        df["regiao"] = df["sg_uf"].map(REGIOES_UF)
+    for coluna in COLUNAS_MUNICIPIO:
+        if coluna not in df.columns:
+            df[coluna] = np.nan
+    return df
+
+
+def montar_municipio(formulario):
+    """Monta a linha de um município digitado no formulário, com os indicadores convertidos para número."""
+    nome = formulario.get("nm_municipio", "").strip()
+    uf = formulario.get("sg_uf")
+    if not nome:
+        raise ValueError("Informe o nome do município.")
+    if uf not in UFS:
+        raise ValueError("Escolha uma UF válida.")
+
+    municipio = {"nm_municipio": nome, "sg_uf": uf}
+    for coluna in carregar_resultados()["variaveis"]:
+        try:
+            municipio[coluna] = float(formulario.get(coluna, ""))
+        except ValueError:
+            raise ValueError(f"{ROTULOS[coluna]} precisa ser um número.") from None
+    return completar_colunas(pd.DataFrame([municipio]))
+
+
+def preparar_arquivo(df):
+    """Confere as colunas do arquivo e mantém só os municípios com nome, UF válida e todos os indicadores."""
+    variaveis = carregar_resultados()["variaveis"]
+    faltando = dados_service.validar_colunas(df, variaveis + COLUNAS_OBRIGATORIAS)
+    if faltando:
+        raise ValueError("faltam as colunas " + ", ".join(faltando) + ".")
+
+    df = df.copy()
+    df["sg_uf"] = df["sg_uf"].str.strip().str.upper()
+    df = df.dropna(subset=variaveis + COLUNAS_OBRIGATORIAS)
+    df = df[df["sg_uf"].isin(UFS)]
+    if df.empty:
+        raise ValueError("nenhum município do arquivo tem nome, UF válida e todos os indicadores.")
+    return completar_colunas(df)
+
+
+def carregar_predicoes_salvas():
+    """Lê a lista de municípios previstos; se ela ainda não existe, devolve uma lista vazia."""
+    if not ARQUIVO_PREDICOES_SALVAS.exists():
+        return pd.DataFrame(columns=COLUNAS_SALVAS)
+    return pd.read_csv(ARQUIVO_PREDICOES_SALVAS)
+
+
+def salvar_predicoes(novas):
+    """Junta as predições novas à lista salva; o mesmo município (nome + UF) previsto de novo é atualizado."""
+    salvas = pd.concat([carregar_predicoes_salvas(), novas[COLUNAS_SALVAS]])
+    salvas = salvas.drop_duplicates(["nm_municipio", "sg_uf"], keep="last")
+    PASTA_PREDICOES.mkdir(parents=True, exist_ok=True)
+    salvas.to_csv(ARQUIVO_PREDICOES_SALVAS, index=False)
+
+
+def limpar_predicoes():
+    """Apaga a lista de municípios previstos."""
+    ARQUIVO_PREDICOES_SALVAS.unlink(missing_ok=True)
+
+
+def adicionar_prob_previsto(df):
+    """Cria a coluna com a probabilidade do partido previsto (a do PT ou a do PL)."""
+    df = df.copy()
+    df["prob_previsto"] = np.where(df["previsto"] == "PT", df["prob_pt"], 1 - df["prob_pt"])
+    return df
+
+
+def ultima_predicao(salvas):
+    """A predição mais recente (última linha da lista salva), ou None se a lista está vazia."""
+    if salvas.empty:
+        return None
+    return adicionar_prob_previsto(salvas).iloc[-1].to_dict()
+
+
+def calcular_valores_iniciais(variaveis):
+    """Mediana de cada variável na base atual, usada como valor inicial do formulário de um município."""
+    return carregar_base_atual()[variaveis].median().round(2).to_dict()
+
+
+def formatar_lista(salvas):
+    """Lista para a tabela: data no padrão brasileiro e municípios ordenados por UF e nome."""
+    df = salvas.copy()
+    df["previsto_em"] = pd.to_datetime(df["previsto_em"]).dt.strftime("%d/%m/%Y %H:%M")
     return df.sort_values(["sg_uf", "nm_municipio"])
 
 
-def carregar_predicoes_teste_mock(modelo):
-    """Predições fictícias do modelo para os municípios de teste, junto com o resultado real de cada um."""
-    predicoes = pd.read_csv(PREDICOES_TESTE_MOCK)
-    predicoes = predicoes[predicoes["modelo"] == modelo]
-    df = predicoes.merge(carregar_base_atual(), on="cd_municipio")
+def montar_painel_lista(salvas, mapa):
+    """Tabelas, gráficos e mapa da lista de municípios previstos; None quando a lista está vazia."""
+    if salvas.empty:
+        return None
+    salvas = adicionar_prob_previsto(salvas)
+    por_uf = resumir_por_grupo(salvas, "sg_uf")
+    return {
+        "por_regiao": resumir_por_grupo(salvas, "regiao").to_dict("records"),
+        "por_uf": por_uf.to_dict("records"),
+        "municipios": formatar_lista(salvas).to_dict("records"),
+        "grafico_previstos_regiao": grafico_previstos_por_regiao(salvas),
+        "grafico_probabilidade_uf": grafico_probabilidade_por_uf(por_uf),
+        "mapa": mapa_por_estado(salvas) if mapa == "estados" else mapa_por_municipio(salvas),
+    }
 
-    previsto_pt = df["previsto"] == "PT"
-    df["prob_previsto"] = np.where(previsto_pt, df["prob_pt"], 1 - df["prob_pt"])
-    df["pct_votos_previsto"] = np.where(previsto_pt, df["pct_votos_pt"], df["pct_votos_pl"])
+
+def carregar_predicoes_teste(modelo):
+    """Predições do modelo nos municípios de teste do último treino, junto com o resultado real de cada um."""
+    predicoes = pd.read_csv(ARQUIVO_PREDICOES_TESTE)
+    predicoes = predicoes[predicoes["modelo"] == modelo]
+    df = adicionar_prob_previsto(predicoes.merge(carregar_base_atual(), on="cd_municipio"))
+    df["pct_votos_previsto"] = np.where(df["previsto"] == "PT", df["pct_votos_pt"], df["pct_votos_pl"])
     df["resultado"] = np.where(df["previsto"] == df["vencedor"], "Acertou", "Errou")
     return df
+
+
+def montar_real_previsto(modelo):
+    """Cards, tabela, gráficos e mapa do real × previsto; None se o teste não está na base atual."""
+    teste = carregar_predicoes_teste(modelo)
+    if teste.empty:
+        return None
+    return {
+        "acertos": resumir_acertos(teste),
+        "acertos_por_regiao": acertos_por_regiao(teste).to_dict("records"),
+        "grafico_real_previsto": grafico_real_previsto(teste),
+        "grafico_probabilidade_votos": grafico_probabilidade_votos(teste),
+        "mapa_acertos": mapa_acertos(teste),
+    }
 
 
 def resumir_previstos(df):
@@ -84,8 +236,9 @@ def resumir_por_grupo(df, coluna):
     df["previsto_pt"] = df["previsto"] == "PT"
     df["eleitores_previsto_pt"] = np.where(df["previsto_pt"], df["qt_eleitores"], 0)
 
+    # Conta pelo nome: municípios digitados não têm código IBGE
     grupos = df.groupby(coluna).agg(
-        municipios=("cd_municipio", "count"),
+        municipios=("nm_municipio", "count"),
         previstos_pt=("previsto_pt", "sum"),
         prob_media_pt=("prob_pt", "mean"),
         eleitores=("qt_eleitores", "sum"),
@@ -142,6 +295,8 @@ def grafico_probabilidade_por_uf(por_uf):
 
 def mapa_por_municipio(df):
     """Mapa com um ponto por município, colorido pelo partido previsto e pela probabilidade."""
+    # Municípios digitados sem latitude e longitude ficam fora do mapa
+    df = df.dropna(subset=["latitude", "longitude"])
     fig = px.scatter_map(
         df, lat="latitude", lon="longitude", color="prob_pt", range_color=[0, 1],
         color_continuous_scale=ESCALA_PROBABILIDADE, hover_name="nm_municipio",
@@ -159,11 +314,11 @@ def mapa_por_municipio(df):
 def mapa_por_estado(df):
     """Mapa com cada estado pintado pela probabilidade média dos seus municípios previstos."""
     df = df.copy()
-    # Os dois primeiros dígitos do código IBGE do município são o código IBGE do estado
-    df["cd_uf"] = (df["cd_municipio"] // 100_000).astype(str)
+    # O código do estado vem da sigla da UF, porque municípios digitados não têm código IBGE
+    df["cd_uf"] = df["sg_uf"].map(CODIGOS_UF)
 
     estados = df.groupby(["cd_uf", "sg_uf"]).agg(
-        municipios=("cd_municipio", "count"),
+        municipios=("nm_municipio", "count"),
         prob_media_pt=("prob_pt", "mean"),
     ).reset_index()
     estados["favorito"] = np.where(estados["prob_media_pt"] >= 0.5, "PT", "PL")
@@ -178,7 +333,9 @@ def mapa_por_estado(df):
         estados, geojson=contorno, featureidkey="properties.codarea", locations="cd_uf",
         color="prob_media_pt", range_color=[0, 1], color_continuous_scale=ESCALA_PROBABILIDADE, opacity=0.8,
         hover_name="sg_uf",
-        hover_data={"municipios": True, "favorito": True, "prob_favorito": ":.0%", "cd_uf": False, "prob_media_pt": False},
+        hover_data={
+            "municipios": True, "favorito": True, "prob_favorito": ":.0%", "cd_uf": False, "prob_media_pt": False,
+        },
         labels=ROTULOS_PREDICAO, map_style="carto-positron", zoom=3, center=CENTRO_BRASIL, height=ALTURA_MAPA,
     )
     fig.update_coloraxes(colorbar=BARRA_DE_CORES)

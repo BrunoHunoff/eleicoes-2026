@@ -12,7 +12,12 @@
   Cada predição fica salva na lista de municípios previstos.
 </p>
 
-<div class="alert alert-info" role="alert">{{ resultados.aviso }}</div>
+{% if base_mudou %}
+<div class="alert alert-warning" role="alert">
+  A base mudou desde o último treino. Re-treine os modelos na página
+  <a href="{{ url_for('modelos.index') }}" class="alert-link">Modelos</a>.
+</div>
+{% endif %}
 
 <p class="small text-secondary mb-2">Modelo usado nas predições</p>
 <ul class="nav nav-pills mb-4">
@@ -25,18 +30,21 @@
   {% endfor %}
 </ul>
 
-{% set predicao = resultados.predicao_exemplo %}
 <section class="card mb-4">
   <div class="card-body">
     <h2 class="h5 card-title">Um município</h2>
-    <p class="text-secondary small">Informe o nome, a UF e os indicadores de um município para prever o partido vencedor.</p>
+    <p class="text-secondary small">
+      Informe o nome, a UF e os indicadores de um município para prever o partido vencedor. Os valores iniciais
+      são a mediana de cada indicador na base atual.
+    </p>
     <div class="row g-4">
       <div class="col-lg-8">
-        <form class="row g-3">
+        <form class="row g-3" method="post" action="{{ url_for('predicao.prever_municipio') }}">
+          <input type="hidden" name="modelo" value="{{ modelo_atual }}">
           <div class="col-sm-6 col-md-8">
             <label for="pred_nm_municipio" class="form-label small">Município</label>
             <input type="text" class="form-control" id="pred_nm_municipio" name="nm_municipio"
-                   placeholder="Nome do município">
+                   placeholder="Nome do município" required>
           </div>
           <div class="col-sm-6 col-md-4">
             <label for="pred_sg_uf" class="form-label small">UF</label>
@@ -50,23 +58,27 @@
           <div class="col-sm-6 col-md-4 d-flex flex-column">
             <label for="pred_{{ coluna }}" class="form-label small">{{ rotulos[coluna] }}</label>
             <input type="number" class="form-control mt-auto" id="pred_{{ coluna }}" name="{{ coluna }}"
-                   step="any" value="{{ predicao.entrada[coluna] }}">
+                   step="any" value="{{ valores_iniciais[coluna] }}" required>
           </div>
           {% endfor %}
           <div class="col-12">
-            <button type="button" class="btn btn-primary" disabled>Prever</button>
-            <span class="form-text ms-2">Disponível na entrega final.</span>
+            <button type="submit" class="btn btn-primary">Prever</button>
           </div>
         </form>
       </div>
       <div class="col-lg-4">
         <div class="card h-100 text-center bg-body-tertiary">
           <div class="card-body d-flex flex-column justify-content-center">
-            <div class="text-secondary small mb-1">Resultado de exemplo · {{ modelos[predicao.modelo] }}</div>
+            {% if ultima %}
+            <div class="text-secondary small mb-1">Última predição · {{ modelos[ultima.modelo] }}</div>
+            <p class="fw-semibold mb-1">{{ ultima.nm_municipio }} ({{ ultima.sg_uf }})</p>
             <p class="fs-5 mb-0">
-              Partido previsto: <strong>{{ predicao.partido_previsto }}</strong>, com
-              {{ (predicao.probabilidade * 100) | numero }}% de probabilidade (exemplo)
+              Partido previsto: <strong>{{ ultima.previsto }}</strong>, com
+              {{ (ultima.prob_previsto * 100) | numero }}% de probabilidade
             </p>
+            {% else %}
+            <p class="text-secondary mb-0">Nenhuma predição feita ainda.</p>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -78,18 +90,21 @@
   <div class="card-body">
     <h2 class="h5 card-title">Vários municípios</h2>
     <p class="text-secondary small">Envie um arquivo para prever vários municípios de uma vez.</p>
-    <form class="row g-2 align-items-end">
+    <form class="row g-2 align-items-end" method="post" action="{{ url_for('predicao.prever_arquivo') }}"
+          enctype="multipart/form-data">
+      <input type="hidden" name="modelo" value="{{ modelo_atual }}">
       <div class="col-md-8">
         <label for="arquivo_predicao" class="form-label">Arquivo de municípios (.csv, .json ou .xml)</label>
-        <input class="form-control" type="file" id="arquivo_predicao" accept=".csv,.json,.xml" disabled>
+        <input class="form-control" type="file" id="arquivo_predicao" name="arquivo" accept=".csv,.json,.xml" required>
       </div>
       <div class="col-md-4">
-        <button type="button" class="btn btn-primary w-100" disabled>Prever arquivo</button>
+        <button type="submit" class="btn btn-primary w-100">Prever arquivo</button>
       </div>
     </form>
     <p class="form-text mb-0">
-      Disponível na entrega final. O arquivo tem as mesmas colunas da base (página Dados), menos as de resultado
-      da eleição (votos e vencedor).
+      Colunas obrigatórias: <code>nm_municipio</code>, <code>sg_uf</code> e as variáveis do último treino
+      ({% for coluna in resultados.variaveis %}<code>{{ coluna }}</code>{{ ", " if not loop.last }}{% endfor %}).
+      As outras colunas da base (página Dados) são opcionais; as de resultado da eleição (votos e vencedor) não são usadas.
     </p>
   </div>
 </section>
@@ -118,12 +133,13 @@
   {% endfor %}
 </section>
 
+{% if lista %}
 <div class="row g-4 mb-4">
   {% set graficos = [
     ("Municípios previstos por região", "Quantos municípios foram previstos para cada partido.",
-      grafico_previstos_regiao),
+      lista.grafico_previstos_regiao),
     ("Probabilidade média de vitória por UF", "O partido que passa da linha de 50% é o favorito na UF.",
-      grafico_probabilidade_uf),
+      lista.grafico_probabilidade_uf),
   ] %}
   {% for titulo, descricao, grafico in graficos %}
   <div class="col-lg-6">
@@ -141,7 +157,7 @@
 <section class="card mb-4">
   <div class="card-body">
     <h3 class="h5 card-title">Resumo por região e por UF</h3>
-    {% for coluna, linhas in [("regiao", por_regiao), ("sg_uf", por_uf)] %}
+    {% for coluna, linhas in [("regiao", lista.por_regiao), ("sg_uf", lista.por_uf)] %}
     <div class="table-responsive tabela-rolagem mb-3">
       <table class="table table-sm align-middle text-nowrap mb-0">
         <thead class="sticky-top">
@@ -166,8 +182,13 @@
             <td class="text-end">{{ linha.previstos_pl }}</td>
             <td class="text-end">{{ pct(linha.prob_media_pt) }}</td>
             <td class="text-end">{{ pct(linha.prob_media_pl) }}</td>
+            {% if linha.eleitores > 0 %}
             <td class="text-end">{{ pct(linha.pct_eleitorado_pt) }}</td>
             <td class="text-end">{{ pct(linha.pct_eleitorado_pl) }}</td>
+            {% else %}
+            <td class="text-end text-secondary">-</td>
+            <td class="text-end text-secondary">-</td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
@@ -177,7 +198,8 @@
     <p class="small text-secondary mb-0">
       <strong>Probabilidade média:</strong> média das probabilidades previstas para os municípios do grupo.
       <strong>Eleitorado:</strong> % dos eleitores do grupo que moram em municípios previstos para cada partido
-      (uma cidade grande pesa mais que várias pequenas).
+      (uma cidade grande pesa mais que várias pequenas). Municípios sem número de eleitores, como os digitados,
+      não entram nessa conta.
     </p>
   </div>
 </section>
@@ -205,10 +227,11 @@
       e azul quando é o PL. Estados sem nenhum município previsto ficam sem cor.
       {% else %}
       Cada ponto é um município: vermelho quando o previsto é o PT e azul quando é o PL. Quanto mais forte a cor,
-      maior a probabilidade; os pontos cinza são os municípios mais divididos.
+      maior a probabilidade; os pontos cinza são os municípios mais divididos. Municípios sem latitude e longitude,
+      como os digitados, não aparecem neste mapa.
       {% endif %}
     </p>
-    {{ mapa_predicao | safe }}
+    {{ lista.mapa | safe }}
   </div>
 </section>
 
@@ -217,8 +240,12 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <h3 class="h5 card-title mb-0">Lista de municípios previstos</h3>
       <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-primary btn-sm" disabled>Baixar CSV</button>
-        <button type="button" class="btn btn-outline-danger btn-sm" disabled>Limpar lista</button>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('predicao.baixar') }}">Baixar CSV</a>
+        <form method="post" action="{{ url_for('predicao.limpar') }}"
+              onsubmit="return confirm('Apagar a lista de municípios previstos?')">
+          <input type="hidden" name="modelo" value="{{ modelo_atual }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm">Limpar lista</button>
+        </form>
       </div>
     </div>
     <div class="table-responsive tabela-rolagem">
@@ -230,7 +257,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for municipio in municipios_previstos %}
+          {% for municipio in lista.municipios %}
           <tr>
             <td>{{ municipio.nm_municipio }}</td>
             <td>{{ municipio.sg_uf }}</td>
@@ -243,11 +270,17 @@
         </tbody>
       </table>
     </div>
-    <p class="form-text mb-0">Baixar CSV e Limpar lista disponíveis na entrega final.</p>
   </div>
 </section>
+{% else %}
+<section class="card">
+  <div class="card-body text-center text-secondary">Nenhum município previsto ainda.</div>
+</section>
+{% endif %}
 
 <h2 class="h4 mt-5 mb-3">Real × previsto</h2>
+{% if real_previsto %}
+{% set acertos = real_previsto.acertos %}
 <p class="text-secondary">
   Como o modelo <strong>{{ modelos[modelo_atual] }}</strong> se saiu nos {{ acertos.municipios }} municípios de
   teste ({{ (resultados.tamanho_teste * 100) | numero }}% da base, que ficaram fora do treino): o resultado real,
@@ -275,10 +308,10 @@
 <div class="row g-4 mb-4">
   {% set graficos = [
     ("Municípios vencidos por partido em cada região", "Barras lisas: resultado real. Barras listradas: previsto pelo modelo.",
-      grafico_real_previsto),
+      real_previsto.grafico_real_previsto),
     ("Probabilidade × votos reais do partido previsto",
       "À direita da linha de 50%, o partido previsto venceu (acerto); à esquerda, perdeu (erro).",
-      grafico_probabilidade_votos),
+      real_previsto.grafico_probabilidade_votos),
   ] %}
   {% for titulo, descricao, grafico in graficos %}
   <div class="col-lg-6">
@@ -299,7 +332,7 @@
       <div class="card-body">
         <h3 class="h5 card-title">Mapa de acertos e erros</h3>
         <p class="text-secondary small">Verde: o modelo acertou o vencedor do município. Laranja: errou.</p>
-        {{ mapa_acertos | safe }}
+        {{ real_previsto.mapa_acertos | safe }}
       </div>
     </section>
   </div>
@@ -316,7 +349,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for linha in acertos_por_regiao %}
+              {% for linha in real_previsto.acertos_por_regiao %}
               <tr>
                 <td class="fw-semibold">{{ linha.regiao }}</td>
                 <td class="text-end">{{ linha.municipios }}</td>
@@ -331,4 +364,12 @@
     </section>
   </div>
 </div>
+{% else %}
+<section class="card">
+  <div class="card-body text-center text-secondary">
+    Os municípios de teste do último treino não estão na base atual. Re-treine os modelos na página
+    <a href="{{ url_for('modelos.index') }}">Modelos</a>.
+  </div>
+</section>
+{% endif %}
 {% endblock %}
