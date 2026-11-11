@@ -123,7 +123,11 @@ Cada linha é **um município** em **uma eleição**. A aplicação aceita qualq
 
 A mensagem de confirmação informa quantas linhas foram removidas.
 
-**Mapa por estado.** O contorno dos 27 estados está em `data/geo/estados.json`. É a malha oficial do IBGE (API de malhas, qualidade mínima).
+**Exemplos nos três formatos.** `data/exemplos/municipios_2022.json` e `municipios_2022.xml` têm a mesma base de 2022 (`data/mock/municipios_2022.csv`) em .json e .xml. São gerados por `scripts/gerar_exemplos.py` e servem para testar o envio de cada formato.
+
+**Fontes.**
+- **Dados fictícios** no formato do TSE (eleitorado e resultado) e do IBGE (população, PIB, coordenadas), gerados por `scripts/gerar_mock.py`.
+- **Malha dos estados**: `data/geo/estados.json`, a malha oficial do IBGE (API de malhas, qualidade mínima), usada no mapa por estado.
 
 ---
 
@@ -136,18 +140,20 @@ Envio da base e visão geral:
 - amostra das primeiras linhas;
 - estatísticas de cada indicador (média, desvio padrão, mínimo, mediana e máximo).
 
-O botão "Voltar para a base de exemplo" desfaz o envio.
+O envio aceita .csv, .json e .xml (até 16 MB). Se faltar coluna, o arquivo é recusado com a lista das que faltam. Depois a base é limpa e a mensagem informa quantos municípios ficaram e quantas linhas foram removidas. A base enviada fica em `data/uploads/`, e o aviso do topo mostra o nome do arquivo em uso.
+
+O botão "Voltar para a base de exemplo" (só aparece quando existe base enviada) desfaz o envio.
 
 ### Análise
 Análise descritiva dos dados que já existem, sem predição:
 - cards com municípios, eleitores, abstenção média e municípios vencidos por partido;
 - barras de municípios vencidos por região e pizza com a proporção;
 - histograma da variável escolhida, separado por partido vencedor;
-- dispersão da variável escolhida × % de votos do partido escolhido;
-- mapa dos municípios (cor = vencedor, tamanho = eleitores);
+- dispersão da variável escolhida × % de votos do partido escolhido (PT ou PL);
+- mapa dos municípios (cor = vencedor, tamanho = eleitores) ou mapa por estado (% de votos no PT, ponderado pelo eleitorado, com o % de cada partido no hover);
 - mapa de calor da correlação entre os indicadores.
 
-Os filtros de região, UF e variável valem para a página inteira.
+Os filtros de região e UF valem para a página inteira (cards, gráficos, mapa e correlação). A variável e o partido valem para o histograma e a dispersão. Valores inválidos na URL são ignorados, e um filtro sem nenhum município mostra um aviso no lugar dos gráficos.
 
 ### Modelos
 Treino e avaliação dos classificadores (detalhes em [Modelos e Predição](#modelos-e-predição)):
@@ -314,8 +320,8 @@ Navegador ──► routes/ ──► services/ ──► (pandas, scikit-learn,
 
 | Membro | Responsabilidades |
 |---|---|
-| **Igor** | Estrutura do projeto Flask, front-end das páginas, base de exemplo, aba Predição (layout, agrupamentos por região e UF, real × previsto) e mapa por estado |
-| **Nicolas** | Upload e limpeza das bases (.csv, .json, .xml), filtros da Análise e arquivos de exemplo |
+| **Igor** | Estrutura do projeto Flask, front-end das páginas, aba Predição (layout, agrupamentos por região e UF, real × previsto) e mapa por estado |
+| **Nicolas** | Upload e limpeza dos dados (.csv, .json, .xml), filtros da Análise (incluindo dispersão por partido e mapa por estado), arquivos de exemplo e README |
 | **Bruno** | Treino dos modelos com scikit-learn, métricas, re-treino e predição real (um município, arquivo e lista salva) |
 
 Apresentação do front-end: 04/11/2026. Entrega final: 11/11/2026.
