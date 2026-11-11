@@ -2,8 +2,13 @@ from pathlib import Path
 
 import pandas as pd
 
-PASTA_MOCK = Path(__file__).resolve().parents[2] / "data" / "mock"
+PASTA_DADOS = Path(__file__).resolve().parents[2] / "data"
+PASTA_MOCK = PASTA_DADOS / "mock"
 BASE_EXEMPLO = PASTA_MOCK / "municipios_2026.csv"
+PASTA_UPLOADS = PASTA_DADOS / "uploads"
+BASE_ENVIADA = PASTA_UPLOADS / "base_atual.csv"
+NOME_BASE_ENVIADA = PASTA_UPLOADS / "nome_base.txt"
+NOME_BASE_EXEMPLO = "municipios_2026.csv (exemplo)"
 
 REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"]
 
@@ -41,9 +46,82 @@ COLUNAS_NUMERICAS = [
 ]
 
 
+COLUNAS_TEXTO = ["sg_uf", "regiao", "nm_municipio", "vencedor"]
+COLUNAS_NUMERO = [coluna for coluna in DICIONARIO_COLUNAS if coluna not in COLUNAS_TEXTO]
+PARTIDOS = ["PT", "PL"]
+
+
+def ler_arquivo(arquivo):
+    """Lê o arquivo enviado (.csv, .json ou .xml) e devolve um DataFrame."""
+    nome = arquivo.filename.lower()
+    if nome.endswith(".csv"):
+        leitor = pd.read_csv
+    elif nome.endswith(".json"):
+        leitor = pd.read_json
+    elif nome.endswith(".xml"):
+        leitor = pd.read_xml
+    else:
+        raise ValueError("Formato não suportado: envie .csv, .json ou .xml")
+    try:
+        return leitor(arquivo.stream)
+    except Exception as erro:
+        raise ValueError(f"Não foi possível ler o arquivo: {erro}") from erro
+
+
+def validar_colunas(df, colunas):
+    """Devolve a lista das colunas obrigatórias que faltam no DataFrame (vazia quando está tudo certo)."""
+    return [coluna for coluna in colunas if coluna not in df.columns]
+
+
+def limpar_base(df):
+    """Limpa a base e devolve (base limpa, número de linhas removidas)."""
+    df = df.copy()
+    linhas_antes = len(df)
+
+    for coluna in COLUNAS_TEXTO:
+        df[coluna] = df[coluna].astype("string").str.strip().replace("", pd.NA)
+    df["sg_uf"] = df["sg_uf"].str.upper()
+    df["vencedor"] = df["vencedor"].str.upper()
+    for coluna in COLUNAS_NUMERO:
+        df[coluna] = pd.to_numeric(df[coluna], errors="coerce")
+
+    df = df.dropna(subset=list(DICIONARIO_COLUNAS))
+    df = df[df["vencedor"].isin(PARTIDOS)]
+    df = df.drop_duplicates(subset="cd_municipio")
+
+    # Depois do dropna não há valores faltando: volta para tipos simples
+    for coluna in COLUNAS_TEXTO:
+        df[coluna] = df[coluna].astype(str)
+    df["ano"] = df["ano"].astype(int)
+    df["cd_municipio"] = df["cd_municipio"].astype(int)
+    return df, linhas_antes - len(df)
+
+
+def salvar_base(df, nome_arquivo):
+    """Grava a base limpa como base atual e guarda o nome original do arquivo enviado."""
+    PASTA_UPLOADS.mkdir(parents=True, exist_ok=True)
+    df.to_csv(BASE_ENVIADA, index=False)
+    NOME_BASE_ENVIADA.write_text(nome_arquivo, encoding="utf-8")
+
+
 def carregar_base_atual():
-    """Devolve a base em uso. Nesta etapa é sempre a base de exemplo (dados fictícios) de 2026."""
+    """Devolve a base enviada, se existir; senão, a base de exemplo (dados fictícios) de 2026."""
+    if BASE_ENVIADA.exists():
+        return pd.read_csv(BASE_ENVIADA)
     return pd.read_csv(BASE_EXEMPLO)
+
+
+def nome_base_atual():
+    """Devolve o nome do arquivo enviado, ou o nome da base de exemplo."""
+    if BASE_ENVIADA.exists() and NOME_BASE_ENVIADA.exists():
+        return NOME_BASE_ENVIADA.read_text(encoding="utf-8")
+    return NOME_BASE_EXEMPLO
+
+
+def voltar_base_exemplo():
+    """Apaga a base enviada para a aplicação voltar a usar a base de exemplo."""
+    BASE_ENVIADA.unlink(missing_ok=True)
+    NOME_BASE_ENVIADA.unlink(missing_ok=True)
 
 
 def resumir_base(df):
