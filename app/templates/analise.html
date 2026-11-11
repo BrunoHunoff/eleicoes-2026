@@ -13,19 +13,21 @@
 </p>
 
 <div class="alert alert-info" role="alert">
-  Base de exemplo com dados fictícios ({{ indicadores.municipios | numero }} municípios)
+  Base em uso: <strong>{{ nome_base }}</strong>{% if not base_enviada %} (dados fictícios){% endif %}.
+  {{ municipios_filtro | numero }} de {{ total_municipios | numero }} municípios no filtro.
 </div>
 
 <section class="card mb-4">
   <div class="card-body">
     <h2 class="h5 card-title">Filtros</h2>
-    <form class="row g-2 align-items-end">
-      <div class="col-sm-6 col-lg-3">
+    <form class="row g-2 align-items-end" method="get" action="{{ url_for('analise.index') }}">
+      <input type="hidden" name="mapa" value="{{ mapa_atual }}">
+      <div class="col-sm-6 col-lg-2">
         <label for="regiao" class="form-label">Região</label>
         <select class="form-select" id="regiao" name="regiao">
           <option value="">Todas</option>
           {% for regiao in regioes %}
-          <option value="{{ regiao }}">{{ regiao }}</option>
+          <option value="{{ regiao }}" {% if regiao == regiao_atual %}selected{% endif %}>{{ regiao }}</option>
           {% endfor %}
         </select>
       </div>
@@ -34,11 +36,11 @@
         <select class="form-select" id="uf" name="uf">
           <option value="">Todas</option>
           {% for uf in ufs %}
-          <option value="{{ uf }}">{{ uf }}</option>
+          <option value="{{ uf }}" {% if uf == uf_atual %}selected{% endif %}>{{ uf }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-6 col-lg-4">
+      <div class="col-sm-6 col-lg-3">
         <label for="variavel" class="form-label">Variável</label>
         <select class="form-select" id="variavel" name="variavel">
           {% for coluna in variaveis %}
@@ -46,16 +48,27 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-6 col-lg-3">
-        <button type="button" class="btn btn-primary w-100" disabled>Filtrar</button>
+      <div class="col-sm-6 col-lg-2">
+        <label for="partido" class="form-label">Partido (dispersão)</label>
+        <select class="form-select" id="partido" name="partido">
+          {% for partido in partidos %}
+          <option value="{{ partido }}" {% if partido == partido_atual %}selected{% endif %}>{{ partido }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-2">
+        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
       </div>
     </form>
     <p class="form-text mb-0">
-      Disponível na entrega final. A variável escolhida é usada no histograma e no gráfico de dispersão.
+      A variável escolhida é usada no histograma e na dispersão; o partido escolhido, no eixo Y da dispersão.
     </p>
   </div>
 </section>
 
+{% if municipios_filtro == 0 %}
+<div class="alert alert-warning" role="alert">Nenhum município com esses filtros.</div>
+{% else %}
 <section class="row g-3 mb-4">
   {% set cards = [
     ("Municípios", indicadores.municipios | numero, none),
@@ -81,7 +94,7 @@
     ("Municípios vencidos por região", barras),
     ("Proporção de municípios vencidos", pizza),
     ("Distribuição: " ~ rotulos[variavel_atual], histograma),
-    (rotulos[variavel_atual] ~ " × votos no PT (%)", dispersao),
+    (rotulos[variavel_atual] ~ " × votos no " ~ partido_atual ~ " (%)", dispersao),
   ] %}
   {% for titulo, grafico in graficos %}
   <div class="col-lg-6">
@@ -95,11 +108,30 @@
   {% endfor %}
 </div>
 
-<section class="card mb-4">
+<section class="card mb-4" id="mapa-analise">
   <div class="card-body">
-    <h2 class="h5 card-title">Mapa dos municípios</h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <h2 class="h5 card-title mb-0">Mapa dos {% if mapa_atual == "estados" %}estados{% else %}municípios{% endif %}</h2>
+      <div class="d-flex align-items-center gap-2">
+        <span class="small text-secondary">Ver por</span>
+        <ul class="nav nav-pills">
+          {% for chave, nome in [("municipios", "Municípios"), ("estados", "Estados")] %}
+          <li class="nav-item">
+            <a class="nav-link py-1 {% if chave == mapa_atual %}active{% endif %}"
+               {% if chave == mapa_atual %}aria-current="page"{% endif %}
+               href="{{ url_for('analise.index', regiao=regiao_atual, uf=uf_atual, variavel=variavel_atual, partido=partido_atual, mapa=chave, _anchor='mapa-analise') }}">{{ nome }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
     <p class="text-secondary small">
+      {% if mapa_atual == "estados" %}
+      Cada estado é pintado pelo % de votos no PT, ponderado pelo eleitorado dos municípios (cidades grandes pesam
+      mais): vermelho quando o PT lidera e azul quando o PL lidera. Passe o mouse para ver o % de cada partido.
+      {% else %}
       Cada ponto é um município: a cor indica o partido mais votado e o tamanho, o número de eleitores.
+      {% endif %}
     </p>
     {{ mapa | safe }}
   </div>
@@ -115,4 +147,5 @@
     <img class="img-fluid d-block mx-auto" src="data:image/png;base64,{{ correlacao }}" alt="Mapa de calor da correlação">
   </div>
 </section>
+{% endif %}
 {% endblock %}

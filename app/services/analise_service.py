@@ -1,8 +1,10 @@
+import json
+
 import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns
 
-from app.services.dados_service import COLUNAS_NUMERICAS, REGIOES, ROTULOS
+from app.services.dados_service import COLUNAS_NUMERICAS, PASTA_DADOS, REGIOES, ROTULOS
 from app.utils import figura_para_base64
 
 # Cores fixas: cada partido tem a mesma cor em todos os gráficos
@@ -16,6 +18,15 @@ ORDEM_CATEGORIAS = {"vencedor": list(CORES_PARTIDOS), "regiao": REGIOES}
 
 # Rótulos legíveis nos eixos, legendas e hovers (inclui a contagem de municípios dos gráficos agregados)
 ROTULOS_GRAFICOS = {**ROTULOS, "municipios": "Municípios"}
+
+# Contorno dos 27 estados (malha do IBGE) e escala do mapa por estado: azul do PL, cinza (empate) e vermelho do PT
+CONTORNO_ESTADOS = PASTA_DADOS / "geo" / "estados.json"
+ESCALA_VOTOS = [CORES_PARTIDOS["PL"], "#b0b0b0", CORES_PARTIDOS["PT"]]
+BARRA_DE_CORES_VOTOS = {
+    "title": "Votos",
+    "tickvals": [0, 25, 50, 75, 100],
+    "ticktext": ["PL 100%", "PL 75%", "50%", "PT 75%", "PT 100%"],
+}
 
 ALTURA_GRAFICO = 400
 ALTURA_MAPA = 550
@@ -33,6 +44,15 @@ def figura_para_html(fig):
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
     )
     return fig.to_html(full_html=False, include_plotlyjs=False)
+
+
+def filtrar(df, regiao, uf):
+    """Mantém só os municípios da região e da UF escolhidas (texto vazio = todas)."""
+    if regiao:
+        df = df[df["regiao"] == regiao]
+    if uf:
+        df = df[df["sg_uf"] == uf]
+    return df
 
 
 def calcular_indicadores(df):
@@ -86,10 +106,10 @@ def grafico_histograma(df, coluna):
     return figura_para_html(fig)
 
 
-def grafico_dispersao(df, coluna):
-    """Dispersão da coluna escolhida (eixo x) com o % de votos no PT (eixo y), um ponto por município."""
+def grafico_dispersao(df, coluna, partido):
+    """Dispersão da coluna escolhida (eixo x) com o % de votos do partido escolhido (eixo y), um ponto por município."""
     fig = px.scatter(
-        df, x=coluna, y="pct_votos_pt", color="regiao", opacity=0.7,
+        df, x=coluna, y="pct_votos_" + partido.lower(), color="regiao", opacity=0.7,
         hover_name="nm_municipio", hover_data={"sg_uf": True},
         color_discrete_map=CORES_REGIOES, category_orders=ORDEM_CATEGORIAS, labels=ROTULOS_GRAFICOS,
         height=ALTURA_GRAFICO,
@@ -109,6 +129,38 @@ def mapa_municipios(df):
         color_discrete_map=CORES_PARTIDOS, category_orders=ORDEM_CATEGORIAS, labels=ROTULOS_GRAFICOS,
         map_style="carto-positron", zoom=3, center=CENTRO_BRASIL, height=ALTURA_MAPA,
     )
+    return figura_para_html(fig)
+
+
+def mapa_estados(df):
+    """Mapa com cada estado pintado pelo % de votos no PT, ponderado pelo eleitorado dos municípios."""
+    df = df.copy()
+    # Os 2 primeiros dígitos do código do município são o código do estado
+    df["cd_uf"] = df["cd_municipio"].astype(str).str[:2]
+    # Ponderar pelo eleitorado: uma cidade grande pesa mais que uma pequena
+    df["votos_pt"] = df["pct_votos_pt"] * df["qt_eleitores"]
+    df["votos_pl"] = df["pct_votos_pl"] * df["qt_eleitores"]
+
+    estados = df.groupby(["cd_uf", "sg_uf"]).agg(
+        municipios=("cd_municipio", "count"),
+        eleitores=("qt_eleitores", "sum"),
+        votos_pt=("votos_pt", "sum"),
+        votos_pl=("votos_pl", "sum"),
+    ).reset_index()
+    estados["pct_votos_pt"] = estados["votos_pt"] / estados["eleitores"]
+    estados["pct_votos_pl"] = estados["votos_pl"] / estados["eleitores"]
+
+    with CONTORNO_ESTADOS.open(encoding="utf-8") as arquivo:
+        contorno = json.load(arquivo)
+
+    fig = px.choropleth_map(
+        estados, geojson=contorno, featureidkey="properties.codarea", locations="cd_uf",
+        color="pct_votos_pt", range_color=[0, 100], color_continuous_scale=ESCALA_VOTOS, opacity=0.8,
+        hover_name="sg_uf",
+        hover_data={"municipios": True, "pct_votos_pt": ":.1f", "pct_votos_pl": ":.1f", "cd_uf": False},
+        labels=ROTULOS_GRAFICOS, map_style="carto-positron", zoom=3, center=CENTRO_BRASIL, height=ALTURA_MAPA,
+    )
+    fig.update_coloraxes(colorbar=BARRA_DE_CORES_VOTOS)
     return figura_para_html(fig)
 
 
