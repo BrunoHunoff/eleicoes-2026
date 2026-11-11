@@ -240,11 +240,12 @@
         <thead>
           <tr>
             <th rowspan="2" class="align-bottom">Modelo</th>
-            <th colspan="2" class="text-center border-bottom-0">Acurácia</th>
+            <th colspan="3" class="text-center border-bottom-0">Acurácia</th>
             <th rowspan="2" class="text-end text-nowrap align-bottom">F1 macro</th>
           </tr>
           <tr>
             <th class="text-end">Treino</th><th class="text-end">Teste</th>
+            <th class="text-end text-nowrap">Validação cruzada</th>
           </tr>
         </thead>
         <tbody>
@@ -262,13 +263,23 @@
             </td>
             <td class="text-end {{ cor }}">{{ pct(linha.acuracia_treino) if linha.acuracia_treino is not none else "-" }}</td>
             <td class="text-end {{ cor }}">{{ pct(linha.acuracia_teste) }}</td>
+            <td class="text-end text-nowrap {{ cor }}">
+              {% if linha.validacao_media is not none %}
+              {{ pct(linha.validacao_media) }} <span class="small">± {{ (linha.validacao_desvio * 100) | numero(1) }}</span>
+              {% else %}-{% endif %}
+            </td>
             <td class="text-end {{ cor }}">{{ linha.f1_macro | numero(2) if linha.f1_macro is not none else "-" }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="small text-secondary mt-2 mb-0">Em destaque, o modelo com a maior acurácia de teste.</p>
+    <p class="small text-secondary mt-2 mb-0">
+      Em destaque, o modelo com a maior acurácia de teste.
+      <strong>Validação cruzada:</strong> o treino é dividido em 5 partes e o modelo é treinado 5 vezes, cada vez
+      avaliado em uma parte diferente (média ± desvio padrão das 5 acurácias). Diferenças entre modelos menores que
+      o desvio podem ser só sorte da divisão entre treino e teste.
+    </p>
   </div>
 </section>
 {% endblock %}

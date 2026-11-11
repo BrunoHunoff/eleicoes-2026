@@ -231,6 +231,7 @@ Uso do modelo treinado:
 
 **Métricas.**
 - **Acurácia de treino e de teste.** Uma diferença acima de 5 pontos percentuais indica possível *overfitting* (o modelo decorou o treino).
+- **Validação cruzada (5 folds)** na tabela de comparação: `KFold(n_splits=5, shuffle=True, random_state=42)` e `cross_val_score` no conjunto de treino, com o Pipeline (o `StandardScaler` é ajustado dentro de cada fold), como na aula de regressão. Mostra a acurácia média ± desvio padrão. Com uma única divisão treino/teste, o resultado pode depender da sorte da divisão; a validação cruzada mostra se ele é estável e se a diferença entre os modelos é maior que o desvio.
 - **Precisão, recall e F1** por partido, e o **F1 macro** (média dos dois).
 - **Matriz de confusão**: real × previsto.
 - **Importância das variáveis**:

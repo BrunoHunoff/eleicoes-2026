@@ -11,7 +11,7 @@ import seaborn as sns
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -47,6 +47,7 @@ PARAMETROS_PADRAO = {
     "logistica": {"C": 1.0},
 }
 TAMANHO_TESTE_PADRAO = 0.2
+FOLDS_VALIDACAO = 5
 
 # campo: (nome na mensagem de erro, mínimo, máximo); os mesmos limites do formulário
 LIMITES = {
@@ -155,15 +156,26 @@ def converter_relatorio(relatorio):
     return convertido
 
 
+def validar_cruzado(modelo, X_treino, y_treino):
+    """Acurácia média e desvio padrão na validação cruzada com 5 folds do treino, como na aula de regressão."""
+    kfold = KFold(n_splits=FOLDS_VALIDACAO, shuffle=True, random_state=42)
+    # Com o Pipeline, o StandardScaler é ajustado dentro de cada fold, sem vazar dados da parte de validação
+    acuracias = cross_val_score(modelo, X_treino, y_treino, cv=kfold, scoring="accuracy")
+    return round(acuracias.mean(), 4), round(acuracias.std(), 4)
+
+
 def avaliar(chave, pipeline, X_treino, X_teste, y_treino, y_teste):
     """Calcula as métricas de um modelo já treinado, no formato usado pela página Modelos."""
     previsto = pipeline.predict(X_teste)
     relatorio = classification_report(y_teste, previsto, labels=CLASSES, output_dict=True, zero_division=0)
+    validacao_media, validacao_desvio = validar_cruzado(pipeline, X_treino, y_treino)
     return {
         "nome": MODELOS_DISPONIVEIS[chave],
         "acuracia_treino": round(accuracy_score(y_treino, pipeline.predict(X_treino)), 4),
         "acuracia_teste": round(accuracy_score(y_teste, previsto), 4),
         "f1_macro": round(f1_score(y_teste, previsto, average="macro"), 4),
+        "validacao_media": validacao_media,
+        "validacao_desvio": validacao_desvio,
         "relatorio": converter_relatorio(relatorio),
         "matriz_confusao": confusion_matrix(y_teste, previsto, labels=CLASSES).tolist(),
         "importancia_variaveis": calcular_importancia(chave, pipeline.named_steps["modelo"], list(X_treino.columns)),
@@ -193,6 +205,7 @@ def treinar_modelos(df, parametros, variaveis, tamanho_teste):
     )
 
     baseline = DummyClassifier(strategy="most_frequent").fit(X_treino, y_treino)
+    baseline_media, baseline_desvio = validar_cruzado(baseline, X_treino, y_treino)
     resultados = {
         "base": dados_service.nome_base_atual(),
         "treinado_em": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -202,6 +215,8 @@ def treinar_modelos(df, parametros, variaveis, tamanho_teste):
         "baseline": {
             "nome": "Baseline (classe mais frequente)",
             "acuracia_teste": round(baseline.score(X_teste, y_teste), 4),
+            "validacao_media": baseline_media,
+            "validacao_desvio": baseline_desvio,
         },
         "modelos": {},
     }
@@ -283,6 +298,9 @@ def montar_comparacao(resultados):
             "acuracia_treino": modelo["acuracia_treino"],
             "acuracia_teste": modelo["acuracia_teste"],
             "f1_macro": modelo["f1_macro"],
+            # .get: um treino salvo antes da validação cruzada não tem esses campos
+            "validacao_media": modelo.get("validacao_media"),
+            "validacao_desvio": modelo.get("validacao_desvio"),
         }
         for chave, modelo in resultados["modelos"].items()
     ]
@@ -293,6 +311,8 @@ def montar_comparacao(resultados):
         "acuracia_treino": None,
         "acuracia_teste": resultados["baseline"]["acuracia_teste"],
         "f1_macro": None,
+        "validacao_media": resultados["baseline"].get("validacao_media"),
+        "validacao_desvio": resultados["baseline"].get("validacao_desvio"),
     })
     maior_acuracia = max(linha["acuracia_teste"] for linha in linhas)
     for linha in linhas:
