@@ -75,13 +75,19 @@ python run.py
 
 Depois, abra **http://localhost:5001** no navegador. A porta é a 5001 porque, no macOS, a 5000 (padrão do Flask) é usada pelo AirPlay.
 
-No primeiro acesso, a aplicação usa a **base de exemplo** e treina os modelos sozinha. Não é preciso preparar nada antes.
+No primeiro acesso, a aplicação usa a **base padrão** (dados reais de 2026, já incluída em `data/reais/`) e treina os modelos sozinha. Não é preciso preparar nada antes.
+
+**Para gerar as bases de novo a partir das fontes oficiais** (opcional; baixa cerca de 520 MB do TSE e do IBGE para `data/raw/`):
+
+```bash
+python scripts/gerar_dataset.py
+```
 
 ---
 
 ## Como usar (passo a passo)
 
-1. **Dados**: confira a base de exemplo ou envie a sua (.csv, .json ou .xml). Para testar, envie `data/mock/municipios_2022.csv` ou um dos arquivos de `data/exemplos/`.
+1. **Dados**: confira a base padrão (2026) ou envie outra (.csv, .json ou .xml). Para testar, envie `data/reais/municipios_2022.csv` (eleição de 2022) ou um dos arquivos de `data/exemplos/`.
 2. **Análise**: explore os gráficos e use os filtros de região, UF e variável.
 3. **Modelos**: escolha o classificador, ajuste os parâmetros e as variáveis e clique em **Treinar**. Compare as métricas dos três modelos. Se você enviou uma base nova, clique em **Re-treinar**.
 4. **Predição**: escolha o modelo, preveja um município digitando os indicadores ou vários enviando um arquivo. Veja o resultado por região, por UF e no mapa, e compare o previsto com o real.
@@ -113,7 +119,21 @@ Cada linha é **um município** em **uma eleição**. A aplicação aceita qualq
 | `pct_votos_pt`, `pct_votos_pl` | % dos votos válidos de cada partido no 2º turno | TSE |
 | `vencedor` | Partido mais votado no município no 2º turno (PT ou PL) | TSE |
 
-**Base de exemplo.** Os arquivos `data/mock/municipios_2022.csv` e `municipios_2026.csv` têm **dados fictícios**: 1.000 municípios gerados por `scripts/gerar_mock.py`. As colunas são as mesmas da base real (TSE + IBGE), e os valores foram sorteados com relações plausíveis entre si (renda, escolaridade, idade e voto), para que os gráficos e os modelos tenham padrões a mostrar. **Não são resultados reais.**
+**Bases reais.** `data/reais/municipios_2022.csv` e `municipios_2026.csv` têm os **5.570 municípios** do Brasil, com os dados oficiais do 2º turno presidencial de cada ano (PT × PL nas duas eleições). A de 2026 é a base padrão da aplicação. Conferência: somando os municípios, o PT tem 50,9% dos votos válidos em 2022, o resultado oficial (sem as seções do exterior).
+
+**Como a base foi montada (tratamento dos dados).** O script `scripts/gerar_dataset.py` baixa os arquivos brutos e trata tudo com pandas:
+1. **Lê só as colunas necessárias** dos arquivos do TSE (`usecols`). O arquivo de votação tem 47 colunas e o de perfil do eleitorado, 27; as outras (datas de geração, códigos de eleição, raça, estado civil etc.) são descartadas.
+2. **Filtra as linhas** com máscaras: só o 2º turno, só o cargo de presidente e sem as seções do exterior (UF `ZZ`).
+3. **Agrupa por município** (`groupby(...).agg(...)`): os arquivos do TSE vêm por zona eleitoral, e um município pode ter várias zonas.
+4. **Calcula os percentuais**: votos de PT e PL (`np.where` separa os votos de cada partido), abstenção, brancos e nulos, gênero, faixa etária e escolaridade. O perfil do eleitorado de 2026 tem 11 milhões de linhas (2,2 GB); com `usecols`, só 5 das 27 colunas são carregadas.
+5. **Junta as fontes** com `merge`: votação + perfil (TSE) + código IBGE, nome, coordenadas, população e PIB (IBGE). O código de município do TSE é diferente do IBGE; a tabela de correspondência faz a ligação.
+6. **Remove colunas auxiliares** (`drop`) usadas só nos cálculos, como os votos absolutos e as somas por grupo.
+7. **Trata ausentes e duplicados** como na aula de regressão: `isnull().sum()`, `duplicated().sum()` e `drop_duplicates().dropna()`. Como os nulos são poucos, as linhas são removidas em vez de imputadas. Em 2026, um município criado depois da tabela de correspondência não tem código IBGE e é removido.
+8. **Confere o alvo** (`value_counts()`): 2022 tem 3.123 municípios vencidos pelo PT e 2.447 pelo PL; 2026, 2.875 e 2.695.
+
+O script imprime cada etapa (ausentes, duplicados, linhas removidas e contagem do alvo).
+
+**Notebook do tratamento.** `notebooks/tratamento_dados.ipynb` mostra as etapas uma a uma, no formato das aulas: `head`, `info`, `describe`, filtro com máscara, remoção de colunas com `drop`, `isnull`, `duplicated`, `groupby`, `value_counts` e gráficos exploratórios (histograma, boxplot e mapa de calor da correlação). As saídas já estão salvas no arquivo. Para rodar de novo, gere os arquivos brutos com o script e instale o Jupyter (`pip install notebook`).
 
 **Limpeza no envio.** Quando uma base é enviada, a aplicação:
 - confere se todas as colunas existem (e avisa quais faltam);
@@ -123,10 +143,13 @@ Cada linha é **um município** em **uma eleição**. A aplicação aceita qualq
 
 A mensagem de confirmação informa quantas linhas foram removidas.
 
-**Exemplos nos três formatos.** `data/exemplos/municipios_2022.json` e `municipios_2022.xml` têm a mesma base de 2022 (`data/mock/municipios_2022.csv`) em .json e .xml. São gerados por `scripts/gerar_exemplos.py` e servem para testar o envio de cada formato.
+**Exemplos nos três formatos.** `data/exemplos/municipios_2022.json` e `municipios_2022.xml` têm a mesma base real de 2022 (`data/reais/municipios_2022.csv`) em .json e .xml. São gerados por `scripts/gerar_exemplos.py` e servem para testar o envio de cada formato.
 
 **Fontes.**
-- **Dados fictícios** no formato do TSE (eleitorado e resultado) e do IBGE (população, PIB, coordenadas), gerados por `scripts/gerar_mock.py`.
+- **TSE, [Portal de Dados Abertos](https://dadosabertos.tse.jus.br/)**: `detalhe_votacao_munzona` (eleitores aptos, abstenção, brancos e nulos), `votacao_partido_munzona` (votos por partido) e `perfil_eleitorado` (gênero, idade e escolaridade), de 2022 e 2026.
+- **IBGE, [API SIDRA](https://apisidra.ibge.gov.br/)**: população do Censo 2022 (tabela 4714) e PIB dos municípios de 2023 (tabela 5938). O PIB per capita é o PIB de 2023 dividido pela população do Censo 2022.
+- **Coordenadas** da sede de cada município: [kelvins/municipios-brasileiros](https://github.com/kelvins/municipios-brasileiros), com base no IBGE.
+- **Correspondência entre código TSE e código IBGE**: [betafcc/Municipios-Brasileiros-TSE](https://github.com/betafcc/Municipios-Brasileiros-TSE).
 - **Malha dos estados**: `data/geo/estados.json`, a malha oficial do IBGE (API de malhas, qualidade mínima), usada no mapa por estado.
 
 ---
@@ -142,7 +165,7 @@ Envio da base e visão geral:
 
 O envio aceita .csv, .json e .xml (até 16 MB). Se faltar coluna, o arquivo é recusado com a lista das que faltam. Depois a base é limpa e a mensagem informa quantos municípios ficaram e quantas linhas foram removidas. A base enviada fica em `data/uploads/`, e o aviso do topo mostra o nome do arquivo em uso.
 
-O botão "Voltar para a base de exemplo" (só aparece quando existe base enviada) desfaz o envio.
+O botão "Voltar para a base padrão" (só aparece quando existe base enviada) desfaz o envio.
 
 ### Análise
 Análise descritiva dos dados que já existem, sem predição:
@@ -227,7 +250,7 @@ Uso do modelo treinado:
 - **Um município**: nome, UF e as variáveis do último treino. Os valores iniciais do formulário são a mediana de cada variável na base atual. A região vem da UF. Como não tem latitude, longitude nem número de eleitores, o município aparece nas tabelas e no mapa por estado, mas não no mapa por município nem no % do eleitorado.
 - **Vários municípios**: arquivo .csv, .json ou .xml com `nm_municipio`, `sg_uf` e as variáveis do último treino. As outras colunas são opcionais. Linhas sem algum desses dados ou com UF inválida são ignoradas, e a mensagem informa quantas.
 - Cada predição guarda o município, o modelo usado, a data, o partido previsto e a probabilidade do PT. Se o mesmo município (nome + UF) for previsto de novo, a linha é **atualizada**, não repetida.
-- A lista pode ser baixada em CSV (**Baixar CSV**) ou apagada (**Limpar lista**). Para testar o envio, use `data/exemplos/municipios_para_prever.csv` (30 municípios da base de 2022, sem as colunas de resultado).
+- A lista pode ser baixada em CSV (**Baixar CSV**) ou apagada (**Limpar lista**). Para testar o envio, use `data/exemplos/municipios_para_prever.csv` (30 municípios reais da base de 2022, sem as colunas de resultado).
 
 **Por que a comparação real × previsto usa só os municípios de teste.** Os municípios usados no treino já foram "vistos" pelo modelo. Medir o acerto neles daria uma nota inflada, como fazer a prova com o gabarito.
 
@@ -263,15 +286,18 @@ eleicoes-2026/
 │   ├── templates/          # HTML (Jinja + Bootstrap 5); base.html tem o menu e as mensagens
 │   └── static/css/         # Estilos próprios
 ├── data/
-│   ├── mock/               # Bases de exemplo fictícias (2022 e 2026)
+│   ├── reais/              # Bases reais de 2022 e 2026 (TSE + IBGE), geradas por scripts/gerar_dataset.py
+│   ├── raw/                # Arquivos brutos do TSE e do IBGE (baixados pelo script, fora do git)
 │   ├── exemplos/           # A base de 2022 em .json e .xml e municípios para testar a predição
 │   ├── geo/                # Contorno dos estados (malha do IBGE) para o mapa por estado
 │   ├── uploads/            # Base enviada pelo usuário (criada pela aplicação, fora do git)
 │   ├── modelos/            # Modelos treinados e resultados (criada pela aplicação, fora do git)
 │   └── predicoes/          # Lista de municípios previstos (criada pela aplicação, fora do git)
+├── notebooks/
+│   └── tratamento_dados.ipynb  # Tratamento dos dados passo a passo, no formato das aulas
 └── scripts/
-    ├── gerar_mock.py       # Gera as bases fictícias de exemplo
-    └── gerar_exemplos.py   # Converte a base de exemplo para .json e .xml
+    ├── gerar_dataset.py    # Baixa e trata os dados do TSE e do IBGE e gera as bases reais
+    └── gerar_exemplos.py   # Converte a base real de 2022 para .json e .xml e sorteia municípios para prever
 ```
 
 ---
@@ -322,6 +348,6 @@ Navegador ──► routes/ ──► services/ ──► (pandas, scikit-learn,
 |---|---|
 | **Igor** | Estrutura do projeto Flask, front-end das páginas, aba Predição (layout, agrupamentos por região e UF, real × previsto) e mapa por estado |
 | **Nicolas** | Upload e limpeza dos dados (.csv, .json, .xml), filtros da Análise (incluindo dispersão por partido e mapa por estado), arquivos de exemplo e README |
-| **Bruno** | Treino dos modelos com scikit-learn, métricas, re-treino e predição real (um município, arquivo e lista salva) |
+| **Bruno** | Bases reais (download e tratamento dos dados do TSE e do IBGE), treino dos modelos com scikit-learn, métricas, re-treino e predição real (um município, arquivo e lista salva) |
 
 Apresentação do front-end: 04/11/2026. Entrega final: 11/11/2026.

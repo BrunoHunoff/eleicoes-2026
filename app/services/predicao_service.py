@@ -12,7 +12,7 @@ from app.services.analise_service import (
     ALTURA_GRAFICO, ALTURA_MAPA, CENTRO_BRASIL, CORES_PARTIDOS, ORDEM_CATEGORIAS, ROTULOS_GRAFICOS,
     contar_municipios, figura_para_html,
 )
-from app.services.dados_service import PASTA_MOCK, ROTULOS, carregar_base_atual
+from app.services.dados_service import PASTA_DADOS, ROTULOS, carregar_base_atual
 from app.services.modelos_service import (
     ARQUIVO_PREDICOES_TESTE, caminho_modelo, carregar_resultados, probabilidade_pt,
 )
@@ -20,7 +20,7 @@ from app.services.modelos_service import (
 PASTA_PREDICOES = Path(__file__).resolve().parents[2] / "data" / "predicoes"
 ARQUIVO_PREDICOES_SALVAS = PASTA_PREDICOES / "salvas.csv"
 # Contorno dos 27 estados (malha do IBGE); cada estado é identificado pelo código IBGE da UF
-CONTORNO_ESTADOS = PASTA_MOCK.parent / "geo" / "estados.json"
+CONTORNO_ESTADOS = PASTA_DADOS / "geo" / "estados.json"
 
 # Dados do município guardados na lista de previstos, sem nenhuma coluna de resultado
 COLUNAS_MUNICIPIO = ["cd_municipio", "nm_municipio", "sg_uf", "regiao", "latitude", "longitude", "qt_eleitores"]

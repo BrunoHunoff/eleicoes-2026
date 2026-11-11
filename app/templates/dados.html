@@ -11,7 +11,7 @@
 
 <div class="alert alert-info" role="alert">
   Base em uso: <strong>{{ nome_base }}</strong>
-  {% if not base_enviada %}(<strong>dados fictícios</strong>, no mesmo formato da base real, TSE + IBGE){% endif %}
+  {% if not base_enviada %}(dados reais do 2º turno de 2026, do <strong>TSE</strong> e do <strong>IBGE</strong>, tratados por <code>scripts/gerar_dataset.py</code>){% endif %}
 </div>
 
 <section class="card mb-4">
@@ -32,7 +32,7 @@
     </p>
     {% if base_enviada %}
     <form class="mt-3" method="post" action="{{ url_for('dados.voltar_exemplo') }}">
-      <button type="submit" class="btn btn-outline-secondary btn-sm">Voltar para a base de exemplo</button>
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Voltar para a base padrão</button>
     </form>
     {% endif %}
   </div>

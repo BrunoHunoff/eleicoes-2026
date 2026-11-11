@@ -11,7 +11,7 @@ from app.utils import figura_para_base64
 CORES_PARTIDOS = {"PT": "#c4122d", "PL": "#1d4e9e"}
 
 # Paleta das regiões sem vermelho e azul fortes, para não confundir região com partido
-CORES_REGIOES = dict(zip(REGIOES, px.colors.qualitative.Dark2))
+CORES_REGIOES = dict(zip(REGIOES, px.colors.qualitative.Dark2, strict=False))
 
 # Mesma ordem de partidos e regiões em todas as legendas e eixos
 ORDEM_CATEGORIAS = {"vencedor": list(CORES_PARTIDOS), "regiao": REGIOES}

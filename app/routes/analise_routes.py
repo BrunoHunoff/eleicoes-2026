@@ -11,6 +11,7 @@ PARTIDO_PADRAO = "PT"
 
 @analise_bp.get("/analise")
 def index():
+    """Página Análise: aplica os filtros da URL e monta indicadores, gráficos e mapas."""
     df = dados_service.carregar_base_atual()
     ufs_da_base = sorted(df["sg_uf"].unique())
 

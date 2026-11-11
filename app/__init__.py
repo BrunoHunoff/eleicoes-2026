@@ -10,6 +10,7 @@ from config import Config
 
 
 def create_app():
+    """Cria a aplicação Flask, registra o filtro de números e as páginas (blueprints)."""
     app = Flask(__name__)
     app.config.from_object(Config)
     app.add_template_filter(formatar_numero, "numero")

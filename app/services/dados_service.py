@@ -3,12 +3,13 @@ from pathlib import Path
 import pandas as pd
 
 PASTA_DADOS = Path(__file__).resolve().parents[2] / "data"
-PASTA_MOCK = PASTA_DADOS / "mock"
-BASE_EXEMPLO = PASTA_MOCK / "municipios_2026.csv"
+# Bases reais geradas por scripts/gerar_dataset.py a partir dos dados do TSE e do IBGE
+PASTA_REAIS = PASTA_DADOS / "reais"
+BASE_EXEMPLO = PASTA_REAIS / "municipios_2026.csv"
 PASTA_UPLOADS = PASTA_DADOS / "uploads"
 BASE_ENVIADA = PASTA_UPLOADS / "base_atual.csv"
 NOME_BASE_ENVIADA = PASTA_UPLOADS / "nome_base.txt"
-NOME_BASE_EXEMPLO = "municipios_2026.csv (exemplo)"
+NOME_BASE_EXEMPLO = "municipios_2026.csv (padrão)"
 
 REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"]
 
@@ -27,8 +28,12 @@ DICIONARIO_COLUNAS = {
     "pct_feminino": ("Eleitorado feminino (%)", "Percentual de mulheres no eleitorado", "TSE"),
     "pct_16_29": ("Eleitores de 16 a 29 anos (%)", "Percentual do eleitorado entre 16 e 29 anos", "TSE"),
     "pct_60_mais": ("Eleitores com 60 anos ou mais (%)", "Percentual do eleitorado com 60 anos ou mais", "TSE"),
-    "pct_ensino_superior": ("Ensino superior completo (%)", "Percentual do eleitorado com ensino superior completo", "TSE"),
-    "pct_ate_fundamental": ("Até o ensino fundamental (%)", "Percentual do eleitorado com no máximo o ensino fundamental", "TSE"),
+    "pct_ensino_superior": (
+        "Ensino superior completo (%)", "Percentual do eleitorado com ensino superior completo", "TSE",
+    ),
+    "pct_ate_fundamental": (
+        "Até o ensino fundamental (%)", "Percentual do eleitorado com no máximo o ensino fundamental", "TSE",
+    ),
     "pct_abstencao": ("Abstenção (%)", "Percentual de eleitores que não votaram no 2º turno", "TSE"),
     "pct_brancos_nulos": ("Brancos e nulos (%)", "Percentual de votos brancos e nulos no 2º turno", "TSE"),
     "pct_votos_pt": ("Votos no PT (%)", "Percentual dos votos válidos para o PT no 2º turno", "TSE"),
@@ -105,21 +110,21 @@ def salvar_base(df, nome_arquivo):
 
 
 def carregar_base_atual():
-    """Devolve a base enviada, se existir; senão, a base de exemplo (dados fictícios) de 2026."""
+    """Devolve a base enviada, se existir; senão, a base padrão: dados reais de 2026."""
     if BASE_ENVIADA.exists():
         return pd.read_csv(BASE_ENVIADA)
     return pd.read_csv(BASE_EXEMPLO)
 
 
 def nome_base_atual():
-    """Devolve o nome do arquivo enviado, ou o nome da base de exemplo."""
+    """Devolve o nome do arquivo enviado, ou o nome da base padrão."""
     if BASE_ENVIADA.exists() and NOME_BASE_ENVIADA.exists():
         return NOME_BASE_ENVIADA.read_text(encoding="utf-8")
     return NOME_BASE_EXEMPLO
 
 
 def voltar_base_exemplo():
-    """Apaga a base enviada para a aplicação voltar a usar a base de exemplo."""
+    """Apaga a base enviada para a aplicação voltar a usar a base padrão."""
     BASE_ENVIADA.unlink(missing_ok=True)
     NOME_BASE_ENVIADA.unlink(missing_ok=True)
 

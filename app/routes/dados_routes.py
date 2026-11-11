@@ -10,6 +10,7 @@ LINHAS_AMOSTRA = 10
 
 @dados_bp.get("/dados")
 def index():
+    """Página Dados: resumo, dicionário, amostra e estatísticas da base atual."""
     df = dados_service.carregar_base_atual()
     amostra = df.head(LINHAS_AMOSTRA)
     return render_template(
@@ -59,9 +60,9 @@ def enviar():
 
 @dados_bp.post("/dados/voltar-exemplo")
 def voltar_exemplo():
-    """Apaga a base enviada e volta para a base de exemplo."""
+    """Apaga a base enviada e volta para a base padrão."""
     dados_service.voltar_base_exemplo()
-    flash("Voltou para a base de exemplo. Clique em Re-treinar na página Modelos.", "success")
+    flash("Voltou para a base padrão. Clique em Re-treinar na página Modelos.", "success")
     return redirect(url_for("dados.index"))
 
 
