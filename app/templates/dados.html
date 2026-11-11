@@ -10,25 +10,31 @@
 </p>
 
 <div class="alert alert-info" role="alert">
-  Base de exemplo com <strong>dados fictícios</strong>, no mesmo formato da base real (TSE + IBGE).
+  Base em uso: <strong>{{ nome_base }}</strong>
+  {% if not base_enviada %}(<strong>dados fictícios</strong>, no mesmo formato da base real, TSE + IBGE){% endif %}
 </div>
 
 <section class="card mb-4">
   <div class="card-body">
     <h2 class="h5 card-title">Enviar base</h2>
-    <form class="row g-2 align-items-end">
+    <form class="row g-2 align-items-end" method="post" action="{{ url_for('dados.enviar') }}" enctype="multipart/form-data">
       <div class="col-md-8">
         <label for="arquivo" class="form-label">Arquivo da base (.csv, .json ou .xml)</label>
-        <input class="form-control" type="file" id="arquivo" accept=".csv,.json,.xml" disabled>
+        <input class="form-control" type="file" id="arquivo" name="arquivo" accept=".csv,.json,.xml" required>
       </div>
       <div class="col-md-4">
-        <button type="button" class="btn btn-primary w-100" disabled>Enviar base</button>
+        <button type="submit" class="btn btn-primary w-100">Enviar base</button>
       </div>
     </form>
     <p class="form-text mb-0">
-      Disponível na entrega final. O arquivo deve ter as colunas do dicionário abaixo;
-      ao enviar uma nova base, gráficos e modelos passam a usá-la.
+      O arquivo deve ter as colunas do dicionário abaixo (exemplos em <code>data/exemplos/</code>);
+      ao enviar uma nova base, as páginas Dados e Análise passam a usá-la. Para os modelos, clique em Re-treinar.
     </p>
+    {% if base_enviada %}
+    <form class="mt-3" method="post" action="{{ url_for('dados.voltar_exemplo') }}">
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Voltar para a base de exemplo</button>
+    </form>
+    {% endif %}
   </div>
 </section>
 
